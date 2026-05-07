@@ -4,20 +4,57 @@
  * Multi-step form for collecting AI tool usage data.
  * Validates input on the client with Zod, then submits to POST /api/audit.
  *
- * NOTE: This is a placeholder component. The full implementation will include:
- * - Multi-step form flow (company info → tool selection → review & submit)
- * - Real-time cost preview as tools are selected
- * - Animated transitions between steps
- * - Client-side validation with error messages
+ * Persists form data to localStorage so progress survives page reloads.
  */
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import type { AuditFormData } from "@/lib/validators";
 
 export default function AuditForm() {
   const [step, setStep] = useState(1);
   const totalSteps = 3;
+
+  // Form State
+  const [formData, setFormData] = useState<AuditFormData>({
+    companyName: "",
+    teamSize: 1,
+    email: "",
+    tools: [],
+  });
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("auditFormData");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setFormData(parsed);
+      } catch (e) {
+        console.error("Failed to parse saved form data", e);
+      }
+    }
+  }, []);
+
+  // Save to localStorage on change
+  useEffect(() => {
+    localStorage.setItem("auditFormData", JSON.stringify(formData));
+  }, [formData]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value, type } = e.target;
+    
+    // Map HTML IDs back to state properties
+    let key = id;
+    if (id === "company-name") key = "companyName";
+    if (id === "team-size") key = "teamSize";
+
+    setFormData((prev) => ({
+      ...prev,
+      [key]: type === "number" ? (value === "" ? "" : Number(value)) : value,
+    }));
+  };
 
   return (
     <div className="glass rounded-2xl p-8 animate-slide-up" id="audit-form">
@@ -72,6 +109,8 @@ export default function AuditForm() {
             <input
               id="company-name"
               type="text"
+              value={formData.companyName}
+              onChange={handleChange}
               placeholder="Acme Corp"
               className="w-full rounded-lg border border-border bg-surface px-4 py-3 text-foreground placeholder:text-foreground/30 focus:border-accent-primary focus:outline-none focus:ring-1 focus:ring-accent-primary transition-colors"
             />
@@ -87,6 +126,8 @@ export default function AuditForm() {
               id="team-size"
               type="number"
               min={1}
+              value={formData.teamSize || ""}
+              onChange={handleChange}
               placeholder="12"
               className="w-full rounded-lg border border-border bg-surface px-4 py-3 text-foreground placeholder:text-foreground/30 focus:border-accent-primary focus:outline-none focus:ring-1 focus:ring-accent-primary transition-colors"
             />
@@ -101,6 +142,8 @@ export default function AuditForm() {
             <input
               id="email"
               type="email"
+              value={formData.email}
+              onChange={handleChange}
               placeholder="you@startup.com"
               className="w-full rounded-lg border border-border bg-surface px-4 py-3 text-foreground placeholder:text-foreground/30 focus:border-accent-primary focus:outline-none focus:ring-1 focus:ring-accent-primary transition-colors"
             />

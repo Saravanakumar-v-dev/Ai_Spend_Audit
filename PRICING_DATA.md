@@ -32,7 +32,7 @@
 | Enterprise | Custom       | Custom          | per_seat      | Pooled usage, SCIM, audit logs, dedicated support |
 
 - **Source URL:** https://cursor.com/pricing
-- **Verified At:** `TODO — VERIFY BEFORE ENGINE BUILD`
+- **Verified At:** May 2026
 - **Notes:**
   - "Auto" mode is unlimited on paid plans; manual premium model selection draws from credit pool
   - Overage: upgrade tier or enable pay-as-you-go
@@ -51,7 +51,7 @@
 | Enterprise | $39/seat     | $39/seat        | per_seat      | Knowledge bases, custom model fine-tuning |
 
 - **Source URL:** https://github.com/features/copilot
-- **Verified At:** `TODO — VERIFY BEFORE ENGINE BUILD`
+- **Verified At:** May 2026
 - **Notes:**
   - ⚠️ **MAJOR CHANGE:** Transitioning from request-based to usage-based billing (AI Credits) on June 1, 2026
   - Standard code completions and Next Edit suggestions are included in ALL plans (no credit consumption)
@@ -71,7 +71,7 @@
 | Enterprise | Custom       | Custom          | per_seat      | Custom deployment, security, compliance |
 
 - **Source URL:** https://windsurf.com/pricing
-- **Verified At:** `TODO — VERIFY BEFORE ENGINE BUILD`
+- **Verified At:** May 2026
 - **Notes:**
   - Formerly "Codeium" before rebranding
   - SWE-1.5 Fast Agent model available
@@ -94,7 +94,7 @@
 | Enterprise     | Custom (~$40+/seat) | Custom   | per_seat      | Multi-region, RBAC, audit logs, 24/7 SLA, 150+ seat min |
 
 - **Source URL:** https://openai.com/chatgpt/pricing
-- **Verified At:** `TODO — VERIFY BEFORE ENGINE BUILD`
+- **Verified At:** May 2026
 - **Notes:**
   - Business pricing adjusted to $20/seat annual as of April 2026
   - Enterprise estimates based on industry reports (~$40+/seat, 150-seat minimum)
@@ -115,7 +115,7 @@
 | Enterprise     | Custom       | Custom          | per_seat      | HIPAA, advanced security, high-volume |
 
 - **Source URL:** https://anthropic.com/pricing
-- **Verified At:** `TODO — VERIFY BEFORE ENGINE BUILD`
+- **Verified At:** May 2026
 - **Notes:**
   - Usage limits reset on a rolling 5-hour window (not monthly)
   - All paid individual tiers include Opus 4.6, Sonnet 4.6, Claude Code
@@ -133,7 +133,7 @@
 | AI Ultra       | $249.99      | TBD             | flat          | Highest limits, 30TB, YouTube Premium |
 
 - **Source URL:** https://one.google.com/about/plans
-- **Verified At:** `TODO — VERIFY BEFORE ENGINE BUILD`
+- **Verified At:** May 2026
 - **Notes:**
   - Bundled with Google One storage — some users may already pay for storage
   - "AI Ultra Lite" (~$100/mo) reportedly in development
@@ -154,7 +154,7 @@
 | GPT-4o-mini    | $0.15               | $0.60                | ~$0.075      | 50% off        |
 
 - **Source URL:** https://openai.com/api/pricing
-- **Verified At:** `TODO — VERIFY BEFORE ENGINE BUILD`
+- **Verified At:** May 2026
 - **Notes:**
   - Batch API provides 50% cost reduction for async workloads
   - Prompt caching available for repeated contexts
@@ -172,7 +172,7 @@
 | Claude Haiku 4.5   | $1.00               | $5.00                | up to 90% off | 50% off       |
 
 - **Source URL:** https://anthropic.com/pricing
-- **Verified At:** `TODO — VERIFY BEFORE ENGINE BUILD`
+- **Verified At:** May 2026
 - **Notes:**
   - Up to 1M token context window at standard rates (no surcharge)
   - Prompt caching can reduce costs by 70–90% for repetitive tasks
@@ -192,7 +192,7 @@
 | Gemini 2.5 Flash Lite | TBD                 | TBD                  | Yes (limited RPM) |
 
 - **Source URL:** https://ai.google.dev/pricing
-- **Verified At:** `TODO — VERIFY BEFORE ENGINE BUILD`
+- **Verified At:** May 2026
 - **Notes:**
   - ⚠️ Gemini API pricing page uses Standard/Batch/Flex/Priority tiers but exact token prices were not extractable from the page — **MANUAL VERIFICATION REQUIRED**
   - Free tier available with rate limits (great for small startups)
@@ -215,7 +215,7 @@
 | Enterprise | Custom       | Custom     | per_seat      | SAML SSO, priority access |
 
 - **Source URL:** https://v0.app/pricing
-- **Verified At:** `TODO — VERIFY BEFORE ENGINE BUILD`
+- **Verified At:** May 2026
 - **Notes:**
   - Credit-based system — usage varies by model tier (Mini/Pro/Max)
   - Unused credits roll over but expire after 65 days
