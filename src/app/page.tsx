@@ -1,5 +1,5 @@
 /**
- * Landing Page — AI Spend Audit by Credex
+ * Landing Page — AI Spend Audit by Saravanakumar
  *
  * Statically generated (SSG) for instant load and SEO indexing.
  * Contains the marketing hero, value propositions, and the audit form.
@@ -15,7 +15,7 @@ export default function HomePage() {
       <nav className="border-b border-border/50 px-6 py-4">
         <div className="mx-auto max-w-5xl flex items-center justify-between">
           <span className="text-lg font-bold gradient-text">
-            Credex
+            Saravanakumar
           </span>
           <a
             href="#audit-form"
@@ -159,7 +159,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="border-t border-border/50 px-6 py-8">
         <div className="mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-foreground/40">
-          <span>© 2026 Credex. All rights reserved.</span>
+          <span>© 2026 Saravanakumar. All rights reserved.</span>
           <div className="flex gap-6">
             <a href="#" className="hover:text-foreground transition-colors">
               Privacy
@@ -168,12 +168,12 @@ export default function HomePage() {
               Terms
             </a>
             <a
-              href="https://credex.com"
+              href="https://saravanakumar.com"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-foreground transition-colors"
             >
-              Credex →
+              Saravanakumar →
             </a>
           </div>
         </div>

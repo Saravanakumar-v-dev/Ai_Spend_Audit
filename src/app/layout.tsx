@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "AI Spend Audit | Credex — Find Where Your Team Overspends on AI",
+  title: "AI Spend Audit | Saravanakumar — Find Where Your Team Overspends on AI",
   description:
     "Free AI spend audit for startups. Discover how much your team spends on Cursor, Copilot, ChatGPT, Claude, and more — and where you can save.",
   keywords: [
@@ -23,16 +23,16 @@ export const metadata: Metadata = {
     "AI tool comparison",
   ],
   openGraph: {
-    title: "AI Spend Audit by Credex",
+    title: "AI Spend Audit by Saravanakumar",
     description:
       "Find out how much your team is overspending on AI tools. Free personalized audit report.",
     type: "website",
     locale: "en_US",
-    siteName: "Credex AI Spend Audit",
+    siteName: "Saravanakumar AI Spend Audit",
   },
   twitter: {
     card: "summary_large_image",
-    title: "AI Spend Audit by Credex",
+    title: "AI Spend Audit by Saravanakumar",
     description:
       "Find out how much your team is overspending on AI tools. Free personalized audit report.",
   },

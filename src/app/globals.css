@@ -3,7 +3,7 @@
 /* ============================================================
    CREDEX — AI Spend Audit Design System
    ============================================================
-   Design tokens for the Credex brand. All component styling
+   Design tokens for the Saravanakumar brand. All component styling
    should reference these tokens via Tailwind utilities.
    ============================================================ */
 
@@ -16,7 +16,7 @@
   --border: #1e293b;
   --border-accent: #334155;
 
-  /* Accent Palette — Credex Electric Blue to Violet */
+  /* Accent Palette — Saravanakumar Electric Blue to Violet */
   --accent-primary: #6366f1;       /* Indigo 500 */
   --accent-primary-hover: #818cf8; /* Indigo 400 */
   --accent-secondary: #a78bfa;     /* Violet 400 */

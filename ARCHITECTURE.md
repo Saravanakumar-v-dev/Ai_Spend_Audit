@@ -1,21 +1,21 @@
-# ARCHITECTURE.md — AI Spend Audit by Credex
+# ARCHITECTURE.md — AI Spend Audit by Saravanakumar
 
 > **Document Status:** Discovery & Foundation Phase  
 > **Last Updated:** 2026-05-07  
-> **Author:** Credex Engineering
+> **Author:** Saravanakumar Engineering
 
 ---
 
 ## 1. Product Overview
 
-**AI Spend Audit** is a lead-generation web tool that helps startups identify overspending on AI tools (coding assistants, LLM subscriptions, and API usage). Users input their current AI stack and team size, receive a personalized audit report at a unique public URL, and are guided toward Credex's consulting services.
+**AI Spend Audit** is a lead-generation web tool that helps startups identify overspending on AI tools (coding assistants, LLM subscriptions, and API usage). Users input their current AI stack and team size, receive a personalized audit report at a unique public URL, and are guided toward Saravanakumar's consulting services.
 
 ### Core User Flow
 
 1. User lands on the marketing page → fills out the audit form
 2. Engine calculates potential savings based on verified pricing data
 3. A unique, shareable audit report is generated at `/audit/{id}`
-4. Report includes a CTA to book a consultation with Credex
+4. Report includes a CTA to book a consultation with Saravanakumar
 
 ---
 
@@ -42,7 +42,7 @@
 
 #### Tailwind CSS
 - **Rapid prototyping:** Utility-first CSS eliminates stylesheet sprawl during the fast iteration cycles of a startup project.
-- **Design system ready:** `tailwind.config.ts` acts as a single source of truth for Credex brand tokens (colors, spacing, typography).
+- **Design system ready:** `tailwind.config.ts` acts as a single source of truth for Saravanakumar brand tokens (colors, spacing, typography).
 - **Dark mode:** Built-in `dark:` variant for the premium feel the audit report needs.
 
 #### Supabase

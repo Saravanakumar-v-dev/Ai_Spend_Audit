@@ -40,7 +40,7 @@ describe("Audit Engine calculateAudit", () => {
     expect(result.toolResults[0].recommendedPlan).toBe("individual");
   });
 
-  it("3. Credex Discount: A massive enterprise team using Cursor Enterprise", async () => {
+  it("3. Saravanakumar Discount: A massive enterprise team using Cursor Enterprise", async () => {
     const input: AuditFormData = {
       companyName: "BigCorp",
       teamSize: 1000,
@@ -51,12 +51,12 @@ describe("Audit Engine calculateAudit", () => {
     };
 
     // Copilot Enterprise is $39/user. 1000 * 39 = 39000.
-    // Credex 20% discount = 39000 * 0.8 = 31200. Savings = 7800.
+    // Saravanakumar 20% discount = 39000 * 0.8 = 31200. Savings = 7800.
     const result = await calculateAudit(input);
     expect(result.totalCurrentMonthlySpend).toBe(39000);
     expect(result.totalOptimizedMonthlySpend).toBe(31200);
     expect(result.totalMonthlySavings).toBe(7800);
-    expect(result.toolResults[0].recommendedPlan).toContain("Credex Discount");
+    expect(result.toolResults[0].recommendedPlan).toContain("Saravanakumar Discount");
   });
 
   it("4. Alternative suggestion: A user paying for ChatGPT Pro", async () => {

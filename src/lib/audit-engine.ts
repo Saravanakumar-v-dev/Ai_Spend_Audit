@@ -110,11 +110,11 @@ export async function calculateAudit(
           }
         }
 
-        // Rule 2: Compare retail vs credits (Credex 20% discount on Enterprise tiers)
+        // Rule 2: Compare retail vs credits (Saravanakumar 20% discount on Enterprise tiers)
         if (["enterprise", "team_premium"].includes(tool.planName)) {
           optimizedCost = currentCost * 0.8;
-          recommendedPlan = `${tool.planName} (Credex Discount)`;
-          recommendationStr = `Credex can negotiate a 20% discount on your Enterprise/Premium tiers, saving you significant overhead.`;
+          recommendedPlan = `${tool.planName} (Saravanakumar Discount)`;
+          recommendationStr = `Saravanakumar can negotiate a 20% discount on your Enterprise/Premium tiers, saving you significant overhead.`;
         }
 
         // Rule 3: Suggest alternatives (ChatGPT Pro to Plus)

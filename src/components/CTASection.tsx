@@ -1,8 +1,8 @@
 /**
- * CTASection — Call-to-Action for Credex Consulting
+ * CTASection — Call-to-Action for Saravanakumar Consulting
  *
  * Displayed at the bottom of audit reports to convert users
- * into Credex consulting leads. Server component — no client JS.
+ * into Saravanakumar consulting leads. Server component — no client JS.
  */
 
 export default function CTASection() {
@@ -25,13 +25,13 @@ export default function CTASection() {
           Want a deeper analysis?
         </h2>
         <p className="text-foreground/60 mb-8">
-          Our AI cost consultants at Credex can help your team optimize
+          Our AI cost consultants at Saravanakumar can help your team optimize
           spending, negotiate enterprise deals, and build an AI procurement
           strategy tailored to your roadmap.
         </p>
 
         <a
-          href="https://credex.com/contact"
+          href="https://saravanakumar.com/contact"
           target="_blank"
           rel="noopener noreferrer"
           id="cta-book-consultation"
@@ -54,7 +54,7 @@ export default function CTASection() {
         </a>
 
         <p className="mt-4 text-xs text-foreground/40">
-          No commitment required. 30-minute call with a Credex AI strategist.
+          No commitment required. 30-minute call with a Saravanakumar AI strategist.
         </p>
       </div>
     </section>

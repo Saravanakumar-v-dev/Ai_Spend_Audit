@@ -29,10 +29,10 @@ export async function generateMetadata({
   // const audit = await supabase.from("audits").select("*").eq("id", id).single();
 
   return {
-    title: `AI Spend Audit Report — Credex`,
+    title: `AI Spend Audit Report — Saravanakumar`,
     description: `Personalized AI spend audit report. See where your team can save on AI tools.`,
     openGraph: {
-      title: `AI Spend Audit Report — Credex`,
+      title: `AI Spend Audit Report — Saravanakumar`,
       description: `See the full breakdown of AI tool spending and savings opportunities.`,
       type: "website",
     },
@@ -74,7 +74,7 @@ export default async function AuditReportPage({ params }: AuditPageProps) {
       <header className="border-b border-border px-6 py-4">
         <div className="mx-auto max-w-4xl flex items-center justify-between">
           <h1 className="text-xl font-bold gradient-text">
-            Credex AI Spend Audit
+            Saravanakumar AI Spend Audit
           </h1>
           <span className="text-sm text-foreground/50">
             Report ID: {id.slice(0, 8)}...
