@@ -9,38 +9,27 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { AuditFormData } from "@/lib/validators";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 export default function AuditForm() {
   const [step, setStep] = useState(1);
   const totalSteps = 3;
 
-  // Form State
-  const [formData, setFormData] = useState<AuditFormData>({
-    companyName: "",
-    teamSize: 1,
-    email: "",
-    tools: [],
-  });
-
-  // Load from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem("auditFormData");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setFormData(parsed);
-      } catch (e) {
-        console.error("Failed to parse saved form data", e);
-      }
+  // Use custom hook for form persistence
+  const [formData, setFormData, isHydrated] = useLocalStorage<AuditFormData>(
+    "auditFormData",
+    {
+      companyName: "",
+      teamSize: 1,
+      email: "",
+      tools: [],
     }
-  }, []);
+  );
 
-  // Save to localStorage on change
-  useEffect(() => {
-    localStorage.setItem("auditFormData", JSON.stringify(formData));
-  }, [formData]);
+  // Honeypot field state for basic bot validation
+  const [honeypot, setHoneypot] = useState("");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value, type } = e.target;
@@ -55,6 +44,15 @@ export default function AuditForm() {
       [key]: type === "number" ? (value === "" ? "" : Number(value)) : value,
     }));
   };
+
+  const handleHoneypotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setHoneypot(e.target.value);
+  };
+
+  // Prevent flash of empty content during SSR hydration
+  if (!isHydrated) {
+    return <div className="glass rounded-2xl p-8 h-[400px] animate-pulse" />;
+  }
 
   return (
     <div className="glass rounded-2xl p-8 animate-slide-up" id="audit-form">
@@ -146,6 +144,20 @@ export default function AuditForm() {
               onChange={handleChange}
               placeholder="you@startup.com"
               className="w-full rounded-lg border border-border bg-surface px-4 py-3 text-foreground placeholder:text-foreground/30 focus:border-accent-primary focus:outline-none focus:ring-1 focus:ring-accent-primary transition-colors"
+            />
+          </div>
+          
+          {/* Honeypot field - visually hidden to catch bots */}
+          <div className="absolute left-[-9999px] top-[-9999px]" aria-hidden="true">
+            <label htmlFor="website_url">Do not fill this out if you are human</label>
+            <input
+              type="text"
+              id="website_url"
+              name="website_url"
+              tabIndex={-1}
+              autoComplete="off"
+              value={honeypot}
+              onChange={handleHoneypotChange}
             />
           </div>
         </div>

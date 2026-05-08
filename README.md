@@ -1,36 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Spend Audit
 
-## Getting Started
+A Next.js 15 web application designed to help startups analyze their AI tool subscriptions, discover where they are overspending, and generate actionable savings reports.
 
-First, run the development server:
+## Architecture
+
+This project is built using:
+- **Next.js 15 (App Router)**: Fast Server Components and API Routes.
+- **Tailwind CSS v4**: Utility-first styling with modern features.
+- **Supabase**: PostgreSQL database with Row Level Security (RLS) for data persistence.
+- **Zod**: Shared schema validation between the client and API.
+- **Vitest**: Lightning-fast unit testing for engine accuracy.
+
+## Engineering Decisions
+
+### 1. Database & Security (Supabase / Postgres)
+We chose Supabase (PostgreSQL) for lead storage due to its robust Row Level Security (RLS) policies. By enforcing RLS on the `leads` table, we ensure that the public Next.js client cannot directly read or write arbitrary data. Instead, data is inserted exclusively via the `/api/audit` Next.js server route using a secure `service_role` key. 
+
+### 2. Form Persistence
+To prevent users from losing their progress if they accidentally refresh or navigate away from the multi-step form, a custom `useLocalStorage` React hook was implemented. This hook safely syncs the form state with the browser's `localStorage` while circumventing SSR hydration mismatch errors.
+
+### 3. Data Flow & Lead Capture Structure
+We deliberately structured the database schema to capture the raw `input_data` (a JSONB payload of all tool inputs, seats, and usage estimates) rather than only saving the calculated result. 
+
+**Why?** Saving the raw input JSON is better for future audit re-runs. If pricing changes or the calculation engine algorithms are updated next month, we can retroactively re-run historical lead data against the new engine to discover new upsell or savings opportunities without asking the customer to re-enter their stack. Additionally, we explicitly capture `total_savings` and flag `is_high_savings` (savings > $500/mo) at the database level to optimize querying for our sales team to instantly identify high-value prospects.
+
+### 4. Defensible Audit Engine Math
+The `calculateAudit` engine was designed strictly around real-world verified pricing limits and rules (e.g., catching "Overkill" usage where small teams purchase Enterprise tiers). This ensures that if a startup's finance team reviews the generated report, the math and rationale completely align with standard procurement logic.
+
+## Setup
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Run tests:
+```bash
+npm run test
+```

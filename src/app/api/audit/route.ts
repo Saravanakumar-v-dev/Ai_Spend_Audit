@@ -2,19 +2,28 @@
  * POST /api/audit — Audit Submission Endpoint
  *
  * Receives the audit form data, validates it, runs the audit engine,
- * stores the result in Supabase, and returns the audit ID for redirect.
- *
- * NOTE: The audit engine is not yet implemented. This route will
- * return a placeholder response until the engine is built.
+ * stores the result in Supabase (lead capture), and returns the audit ID.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { AuditFormSchema } from "@/lib/validators";
+import { calculateAudit } from "@/lib/audit-engine";
+// import { supabaseAdmin } from "@/lib/supabase";
+import { sendAuditEmail } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Parse and validate the request body
+    // 1. Parse request body
     const body = await request.json();
+
+    // 2. Honeypot Validation for Bot Protection
+    if (body.website_url) {
+      // Bot filled out the visually hidden field
+      console.warn("Bot detected: Honeypot field filled.");
+      return NextResponse.json({ error: "Bad Request" }, { status: 400 });
+    }
+
+    // 3. Validate structured data via Zod
     const parseResult = AuditFormSchema.safeParse(body);
 
     if (!parseResult.success) {
@@ -29,43 +38,41 @@ export async function POST(request: NextRequest) {
 
     const formData = parseResult.data;
 
-    // 2. TODO: Fetch pricing data for selected tools
-    // const toolSlugs = formData.tools.map((t) => t.toolSlug);
-    // const pricingData = await getPricingForTools(toolSlugs);
+    // 4. Run the Audit Engine (hardcoded MVP pricing rules)
+    const auditResult = await calculateAudit(formData);
 
-    // 3. TODO: Run the audit engine
-    // const auditResult = await calculateAudit(formData, pricingData);
+    // 5. Store the lead in Supabase
+    const isHighSavings = auditResult.totalMonthlySavings > 500;
+    
+    let auditId = "stub-id-" + Date.now();
 
-    // 4. TODO: Store the audit result in Supabase
-    // const { data, error } = await supabaseAdmin
-    //   .from("audits")
-    //   .insert({
-    //     company_name: formData.companyName,
-    //     team_size: formData.teamSize,
-    //     email: formData.email,
-    //     tools_input: formData.tools,
-    //     audit_result: auditResult,
-    //     monthly_spend: auditResult.totalCurrentMonthlySpend,
-    //     potential_savings: auditResult.totalMonthlySavings,
-    //   })
-    //   .select("id")
-    //   .single();
+    /* 
+    // Uncomment once Supabase Admin key is fully configured
+    const { data, error } = await supabaseAdmin
+      .from("leads")
+      .insert({
+        email: formData.email,
+        company: formData.companyName,
+        input_data: formData.tools,
+        total_savings: auditResult.totalMonthlySavings,
+        is_high_savings: isHighSavings,
+      })
+      .select("id")
+      .single();
+      
+    if (error) throw error;
+    auditId = data.id;
+    */
+    
+    const mockAuditUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/audit/${auditId}`;
 
-    // 5. TODO: Send follow-up email via Resend
-    // await sendAuditEmail(formData.email, auditId, auditResult);
+    // 6. Send follow-up email via Resend
+    await sendAuditEmail(formData.email, auditResult, mockAuditUrl);
 
-    // PLACEHOLDER: Return a stub response
     return NextResponse.json(
       {
-        message:
-          "Audit engine not yet implemented. Form data was validated successfully.",
-        validatedData: {
-          companyName: formData.companyName,
-          teamSize: formData.teamSize,
-          email: formData.email,
-          toolCount: formData.tools.length,
-        },
-        // auditId: data.id, // ← Will be returned once engine is built
+        message: "Audit generated and lead saved successfully.",
+        auditId: auditId,
       },
       { status: 200 }
     );
