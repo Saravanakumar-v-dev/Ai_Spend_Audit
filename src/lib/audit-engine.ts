@@ -8,6 +8,7 @@
 import type { AuditFormData, AuditResult, ToolAuditResult } from "./validators";
 
 // Hardcoded verified May 2026 pricing data
+const USD_TO_INR_RATE = 83.5; // Fixed exchange rate for INR analysis
 const PRICING_DB = {
   cursor: {
     pro: { price: 20, billing: "flat" },
@@ -137,9 +138,12 @@ export async function calculateAudit(
       toolName: tool.toolSlug.charAt(0).toUpperCase() + tool.toolSlug.slice(1),
       currentPlan: tool.planName,
       currentMonthlyCost: currentCost,
+      currentMonthlyCostINR: Math.round(currentCost * USD_TO_INR_RATE),
       recommendedPlan,
       recommendedMonthlyCost: optimizedCost !== currentCost ? optimizedCost : undefined,
+      recommendedMonthlyCostINR: optimizedCost !== currentCost ? Math.round(optimizedCost * USD_TO_INR_RATE) : undefined,
       monthlySavings,
+      monthlySavingsINR: Math.round(monthlySavings * USD_TO_INR_RATE),
       savingsPercentage,
       reasoning: recommendationStr || "Your current plan is optimal for this tool.",
       isOverlap: false,
@@ -173,9 +177,13 @@ export async function calculateAudit(
 
   return {
     totalCurrentMonthlySpend,
+    totalCurrentMonthlySpendINR: Math.round(totalCurrentMonthlySpend * USD_TO_INR_RATE),
     totalOptimizedMonthlySpend,
+    totalOptimizedMonthlySpendINR: Math.round(totalOptimizedMonthlySpend * USD_TO_INR_RATE),
     totalMonthlySavings,
+    totalMonthlySavingsINR: Math.round(totalMonthlySavings * USD_TO_INR_RATE),
     totalAnnualSavings,
+    totalAnnualSavingsINR: Math.round(totalAnnualSavings * USD_TO_INR_RATE),
     savingsPercentage,
     toolResults,
     recommendations,

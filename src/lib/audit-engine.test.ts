@@ -16,9 +16,12 @@ describe("Audit Engine calculateAudit", () => {
     // Cursor Teams is $40/user. 10 * 40 = 400.
     const result = await calculateAudit(input);
     expect(result.totalCurrentMonthlySpend).toBe(400);
+    expect(result.totalCurrentMonthlySpendINR).toBe(400 * 83.5);
     // Team of 10 -> not overkill, no enterprise discount
     expect(result.totalOptimizedMonthlySpend).toBe(400);
+    expect(result.totalOptimizedMonthlySpendINR).toBe(400 * 83.5);
     expect(result.totalMonthlySavings).toBe(0);
+    expect(result.totalMonthlySavingsINR).toBe(0);
   });
 
   it("2. Overkill scenario: A team of 2 using Copilot Business", async () => {
