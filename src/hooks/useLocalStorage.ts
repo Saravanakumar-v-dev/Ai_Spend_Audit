@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 /**
  * Custom hook for managing state synchronized with localStorage.
@@ -31,21 +31,22 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
 
   // Return a wrapped version of useState's setter function that
   // persists the new value to localStorage.
-  const setValue = (value: T | ((val: T) => T)) => {
-    try {
+  const setValue = useCallback((value: T | ((val: T) => T)) => {
+    setStoredValue((prev) => {
       // Allow value to be a function so we have same API as useState
-      const valueToStore =
-        value instanceof Function ? value(storedValue) : value;
+      const valueToStore = value instanceof Function ? value(prev) : value;
       
-      setStoredValue(valueToStore);
-      
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(key, JSON.stringify(valueToStore));
+      try {
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(key, JSON.stringify(valueToStore));
+        }
+      } catch (error) {
+        console.error(`Error setting localStorage key "${key}":`, error);
       }
-    } catch (error) {
-      console.error(`Error setting localStorage key "${key}":`, error);
-    }
-  };
+      
+      return valueToStore;
+    });
+  }, [key]);
 
   // If not hydrated yet, return the initialValue to match the server render
   return [isHydrated ? storedValue : initialValue, setValue, isHydrated] as const;
