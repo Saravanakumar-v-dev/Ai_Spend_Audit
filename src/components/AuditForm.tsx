@@ -54,13 +54,13 @@ export default function AuditForm() {
     setHoneypot(e.target.value);
   };
 
-  const addTool = (toolSlug: string, planName: string, quantity: number) => {
+  const addTool = (toolSlug: string, planName: string, quantity: number, estimatedMonthlyTokens?: { inputTokens: number, outputTokens: number }) => {
     setFormData((prev) => {
       // Avoid duplicates for MVP
       if (prev.tools.find((t) => t.toolSlug === toolSlug)) return prev;
       return {
         ...prev,
-        tools: [...prev.tools, { toolSlug, planName, quantity, billingCycle: "monthly" }],
+        tools: [...prev.tools, { toolSlug, planName, quantity, billingCycle: "monthly", estimatedMonthlyTokens }],
       };
     });
   };
@@ -93,7 +93,7 @@ export default function AuditForm() {
         throw new Error(data.error || "Failed to generate audit");
       }
 
-      // Clear local storage on success (optional, but good practice)
+      // Clear local storage on success
       localStorage.removeItem("auditFormData");
       
       // Redirect to the dynamic audit result page
@@ -241,19 +241,20 @@ export default function AuditForm() {
         </div>
       )}
 
-      {/* Step 2: Tool Selection Placeholder */}
+      {/* Step 2: Tool Selection */}
       {step === 2 && (
-        <div className="animate-fade-in space-y-4">
+        <div className="animate-fade-in space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
           <p className="text-sm text-foreground/70 mb-4">
             Select the tools your team currently pays for.
           </p>
           
+          {/* Cursor */}
           <div className="p-4 rounded-xl border border-border bg-surface">
             <div className="flex justify-between items-center mb-2">
               <h4 className="font-semibold text-foreground">Cursor</h4>
             </div>
             {!formData.tools.find(t => t.toolSlug === "cursor") ? (
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button 
                   onClick={() => addTool("cursor", "pro", 1)}
                   className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
@@ -275,12 +276,47 @@ export default function AuditForm() {
             )}
           </div>
 
+          {/* GitHub Copilot */}
+          <div className="p-4 rounded-xl border border-border bg-surface">
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="font-semibold text-foreground">GitHub Copilot</h4>
+            </div>
+            {!formData.tools.find(t => t.toolSlug === "copilot") ? (
+              <div className="flex flex-wrap gap-2">
+                <button 
+                  onClick={() => addTool("copilot", "individual", 1)}
+                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
+                >
+                  Add Individual ($10)
+                </button>
+                <button 
+                  onClick={() => addTool("copilot", "business", formData.teamSize || 1)}
+                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
+                >
+                  Add Business ($19/seat)
+                </button>
+                <button 
+                  onClick={() => addTool("copilot", "enterprise", formData.teamSize || 1)}
+                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
+                >
+                  Add Enterprise ($39/seat)
+                </button>
+              </div>
+            ) : (
+              <div className="flex justify-between items-center text-sm text-accent-primary">
+                <span>Added: {formData.tools.find(t => t.toolSlug === "copilot")?.planName}</span>
+                <button onClick={() => removeTool("copilot")} className="text-red-400 hover:text-red-300">Remove</button>
+              </div>
+            )}
+          </div>
+
+          {/* Claude */}
           <div className="p-4 rounded-xl border border-border bg-surface">
             <div className="flex justify-between items-center mb-2">
               <h4 className="font-semibold text-foreground">Claude</h4>
             </div>
             {!formData.tools.find(t => t.toolSlug === "claude") ? (
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button 
                   onClick={() => addTool("claude", "pro", 1)}
                   className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
@@ -301,6 +337,85 @@ export default function AuditForm() {
               </div>
             )}
           </div>
+
+          {/* ChatGPT */}
+          <div className="p-4 rounded-xl border border-border bg-surface">
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="font-semibold text-foreground">ChatGPT</h4>
+            </div>
+            {!formData.tools.find(t => t.toolSlug === "chatgpt") ? (
+              <div className="flex flex-wrap gap-2">
+                <button 
+                  onClick={() => addTool("chatgpt", "plus", 1)}
+                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
+                >
+                  Add Plus ($20)
+                </button>
+                <button 
+                  onClick={() => addTool("chatgpt", "business", formData.teamSize || 1)}
+                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
+                >
+                  Add Business ($25/seat)
+                </button>
+                <button 
+                  onClick={() => addTool("chatgpt", "pro", 1)}
+                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
+                >
+                  Add Pro ($100)
+                </button>
+              </div>
+            ) : (
+              <div className="flex justify-between items-center text-sm text-accent-primary">
+                <span>Added: {formData.tools.find(t => t.toolSlug === "chatgpt")?.planName}</span>
+                <button onClick={() => removeTool("chatgpt")} className="text-red-400 hover:text-red-300">Remove</button>
+              </div>
+            )}
+          </div>
+
+          {/* Anthropic API */}
+          <div className="p-4 rounded-xl border border-border bg-surface">
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="font-semibold text-foreground">Anthropic API</h4>
+            </div>
+            {!formData.tools.find(t => t.toolSlug === "api_anthropic_sonnet") ? (
+              <div className="flex flex-wrap gap-2">
+                <button 
+                  onClick={() => addTool("api_anthropic_sonnet", "api_usage", 1, { inputTokens: 10, outputTokens: 2 })}
+                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
+                >
+                  Add Moderate Usage (~$60/mo)
+                </button>
+              </div>
+            ) : (
+              <div className="flex justify-between items-center text-sm text-accent-primary">
+                <span>Added: API Usage</span>
+                <button onClick={() => removeTool("api_anthropic_sonnet")} className="text-red-400 hover:text-red-300">Remove</button>
+              </div>
+            )}
+          </div>
+
+          {/* OpenAI API */}
+          <div className="p-4 rounded-xl border border-border bg-surface">
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="font-semibold text-foreground">OpenAI API</h4>
+            </div>
+            {!formData.tools.find(t => t.toolSlug === "api_openai_gpt5_4") ? (
+              <div className="flex flex-wrap gap-2">
+                <button 
+                  onClick={() => addTool("api_openai_gpt5_4", "api_usage", 1, { inputTokens: 10, outputTokens: 2 })}
+                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
+                >
+                  Add Moderate Usage (~$55/mo)
+                </button>
+              </div>
+            ) : (
+              <div className="flex justify-between items-center text-sm text-accent-primary">
+                <span>Added: API Usage</span>
+                <button onClick={() => removeTool("api_openai_gpt5_4")} className="text-red-400 hover:text-red-300">Remove</button>
+              </div>
+            )}
+          </div>
+
         </div>
       )}
 
@@ -318,10 +433,11 @@ export default function AuditForm() {
             {formData.tools.length === 0 ? (
               <p className="text-red-400">Please go back and select at least one tool.</p>
             ) : (
-              <ul className="list-disc list-inside">
+              <ul className="list-disc list-inside space-y-1">
                 {formData.tools.map(tool => (
                   <li key={tool.toolSlug}>
-                    <span className="capitalize">{tool.toolSlug}</span> - {tool.planName} ({tool.quantity} seats)
+                    <span className="capitalize">{tool.toolSlug.replace("api_", "")}</span> - {tool.planName.replace("_", " ")} 
+                    {tool.planName !== "api_usage" ? ` (${tool.quantity} seats)` : " (Estimated Tokens)"}
                   </li>
                 ))}
               </ul>
