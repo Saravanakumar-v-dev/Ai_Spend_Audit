@@ -14,7 +14,9 @@
 - Designed `leads` table schema in Supabase for tracking audit submissions and savings estimates
 - Configured GitHub Actions CI pipeline to enforce green builds on push
 
-## Day 3
-- **Hours worked:** 5 hours
-- **What I did:** Integrated Supabase schema for lead storage (with precise fields: `email`, `input_data`, `total_savings`, `is_high_savings`), implemented a custom `useLocalStorage` React hook for robust form persistence, added a visually hidden honeypot field for bot protection, and wrote the "Decisions" section in `README.md`.
-- **What I learned:** Realized that saving the raw input JSON (`input_data`) is much better for future audit re-runs than saving just the calculated result. This allows us to re-evaluate past leads whenever pricing changes or engine rules update.
+## Day 3 2026-05-08
+Hours worked: 5
+What I did: Implemented form state persistence across reloads. Built the backend lead capture API with Supabase, integrated Resend for transactional emails, and added a honeypot for spam protection.
+What I learned: Realized that using a `useState` initializer with `localStorage` in Next.js causes severe hydration mismatch errors between the SSR HTML and the client render. I had to build a custom `useLocalStorage` hook that returns the initial state on the first render and syncs the stored value in a `useEffect` to safely bridge the gap.
+Blockers / what I'm stuck on: Currently struggling with DNS propagation for Resend. Trying to verify the DKIM and SPF records for the custom domain so the transactional emails stop going directly to the spam folder.
+Plan for tomorrow: Build the core deterministic financial logic for the Audit Engine and create the Results Page UI with the required honesty filter.

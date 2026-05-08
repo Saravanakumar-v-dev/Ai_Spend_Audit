@@ -2,12 +2,16 @@
 -- AI Spend Audit — Supabase Schema Migration (002)
 -- ============================================================
 -- Creates the leads table for capturing prospect data from audits.
--- Updated schema strictly matching Day 3 requirements.
+-- Updated schema strictly matching Day 3 requirements:
+-- Includes email, plus optional company_name, role, and team_size.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS leads (
   id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   email             TEXT NOT NULL,
+  company_name      TEXT,
+  role              TEXT,
+  team_size         INT,
   input_data        JSONB NOT NULL,
   total_savings     NUMERIC NOT NULL,
   is_high_savings   BOOLEAN NOT NULL DEFAULT false,

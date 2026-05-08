@@ -64,14 +64,20 @@ export type ToolSelection = z.infer<typeof ToolSelectionSchema>;
 export const AuditFormSchema = z.object({
   companyName: z
     .string()
-    .min(1, "Company name is required")
     .max(100, "Company name is too long")
-    .trim(),
+    .trim()
+    .optional(),
+  role: z
+    .string()
+    .max(100, "Role is too long")
+    .trim()
+    .optional(),
   teamSize: z
     .number()
     .int("Team size must be a whole number")
     .min(1, "Team size must be at least 1")
-    .max(10000, "Team size seems unreasonably high"),
+    .max(10000, "Team size seems unreasonably high")
+    .optional(),
   email: z
     .string()
     .email("Please enter a valid email address")

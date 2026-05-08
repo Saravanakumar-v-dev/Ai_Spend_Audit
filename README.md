@@ -13,19 +13,14 @@ This project is built using:
 
 ## Engineering Decisions
 
-### 1. Database & Security (Supabase / Postgres)
-We chose Supabase (PostgreSQL) for lead storage due to its robust Row Level Security (RLS) policies. By enforcing RLS on the `leads` table, we ensure that the public Next.js client cannot directly read or write arbitrary data. Instead, data is inserted exclusively via the `/api/audit` Next.js server route using a secure `service_role` key. 
+### 1. Form Persistence: `localStorage` vs. Cookies
+I chose to use a custom `useLocalStorage` React hook for form persistence rather than HTTP-only cookies. While cookies are superior for secure authentication states, the AI Spend Audit form state is non-sensitive, transient input data. Using `localStorage` avoids unnecessary payload weight on every HTTP request back to the server. Furthermore, the custom hook handles hydration safely on the client without forcing the Next.js App Router to abandon static rendering/SSR benefits.
 
-### 2. Form Persistence
-To prevent users from losing their progress if they accidentally refresh or navigate away from the multi-step form, a custom `useLocalStorage` React hook was implemented. This hook safely syncs the form state with the browser's `localStorage` while circumventing SSR hydration mismatch errors.
+### 2. Database Choice: Supabase vs. Custom Postgres Container
+I selected Supabase over deploying a custom PostgreSQL Docker container. For an MVP focusing on rapid validation, setting up Docker, managing volumes, configuring pg_hba.conf, and writing a custom Express/Nest backend adds days of operational overhead. Supabase provides an instant, production-grade Postgres instance with built-in Row Level Security (RLS) policies, allowing our Next.js API routes to insert leads securely via a service_role key without exposing the database to the client.
 
-### 3. Data Flow & Lead Capture Structure
-We deliberately structured the database schema to capture the raw `input_data` (a JSONB payload of all tool inputs, seats, and usage estimates) rather than only saving the calculated result. 
-
-**Why?** Saving the raw input JSON is better for future audit re-runs. If pricing changes or the calculation engine algorithms are updated next month, we can retroactively re-run historical lead data against the new engine to discover new upsell or savings opportunities without asking the customer to re-enter their stack. Additionally, we explicitly capture `total_savings` and flag `is_high_savings` (savings > $500/mo) at the database level to optimize querying for our sales team to instantly identify high-value prospects.
-
-### 4. Defensible Audit Engine Math
-The `calculateAudit` engine was designed strictly around real-world verified pricing limits and rules (e.g., catching "Overkill" usage where small teams purchase Enterprise tiers). This ensures that if a startup's finance team reviews the generated report, the math and rationale completely align with standard procurement logic.
+### 3. Abuse Protection: Honeypot vs. hCaptcha
+To prevent spam bot submissions, I implemented a visually hidden "honeypot" field instead of integrating an active challenge like hCaptcha. The goal of this tool is high-conversion lead generation; adding a CAPTCHA introduces significant user friction that decreases conversion rates. A honeypot silently traps the majority of automated scrapers without taxing the actual human founders filling out the form.
 
 ## Setup
 

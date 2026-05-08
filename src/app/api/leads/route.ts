@@ -1,5 +1,5 @@
 /**
- * POST /api/audit — Audit Submission Endpoint
+ * POST /api/leads — Audit Submission Endpoint
  *
  * Receives the audit form data, validates it, runs the audit engine,
  * stores the result in Supabase (lead capture), and returns the audit ID.
@@ -39,7 +39,9 @@ export async function POST(request: NextRequest) {
     const formData = parseResult.data;
 
     // 4. Run the Audit Engine (hardcoded MVP pricing rules)
-    const auditResult = await calculateAudit(formData);
+    // We treat teamSize as 1 if it's missing (since it's optional now)
+    const engineData = { ...formData, teamSize: formData.teamSize || 1 };
+    const auditResult = await calculateAudit(engineData);
 
     // 5. Store the lead in Supabase
     const isHighSavings = auditResult.totalMonthlySavings > 500;
@@ -52,7 +54,9 @@ export async function POST(request: NextRequest) {
       .from("leads")
       .insert({
         email: formData.email,
-        company: formData.companyName,
+        company_name: formData.companyName || null,
+        role: formData.role || null,
+        team_size: formData.teamSize || null,
         input_data: formData.tools,
         total_savings: auditResult.totalMonthlySavings,
         is_high_savings: isHighSavings,
