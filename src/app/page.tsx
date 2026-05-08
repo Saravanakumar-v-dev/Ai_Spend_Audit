@@ -55,7 +55,7 @@ export default function HomePage() {
 
           <p className="mt-6 text-lg sm:text-xl text-foreground/60 max-w-xl mx-auto leading-relaxed">
             Cursor, Copilot, ChatGPT, Claude — the average startup spends{" "}
-            <span className="text-warning font-semibold">$2,400/dev/year</span>{" "}
+            <span className="text-warning font-semibold">Rs 2.2L/dev/year</span>{" "}
             on AI subscriptions. Most of it is wasted.
           </p>
 

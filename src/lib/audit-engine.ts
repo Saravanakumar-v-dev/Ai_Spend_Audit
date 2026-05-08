@@ -1,149 +1,275 @@
 /**
- * Audit Engine — AI Spend Audit
+ * Audit Engine - AI Spend Audit
  *
- * Implements the core logic for calculating current spend, finding
- * optimizations, and suggesting alternatives.
+ * Calculates current spend and savings opportunities using INR-native pricing.
+ * Values are stored in INR so the audit does not rely on a runtime
+ * USD-to-INR conversion step.
+ *
+ * Pricing basis as of May 8, 2026:
+ * - ChatGPT Business: official INR price from OpenAI's India-localized
+ *   business pricing page.
+ * - Other plans/models: official public USD pricing converted once into fixed
+ *   INR reference amounts using a May 7, 2026 reference rate of 1 USD = Rs 94.37.
  */
 
 import type { AuditFormData, AuditResult, ToolAuditResult } from "./validators";
 
-// Hardcoded verified May 2026 pricing data
-const USD_TO_INR_RATE = 83.5; // Fixed exchange rate for INR analysis
-const PRICING_DB = {
+type SubscriptionBilling = "flat" | "per_seat";
+
+interface SubscriptionPlanPrice {
+  priceInInr: number;
+  annualMonthlyPriceInInr?: number;
+  billing: SubscriptionBilling;
+}
+
+interface ApiModelPrice {
+  inputPerMillionInr: number;
+  outputPerMillionInr: number;
+}
+
+const PRICING_REFERENCE_DATE = "2026-05-08";
+const MILLION_TOKENS = 1_000_000;
+
+const TOOL_NAMES: Record<string, string> = {
+  cursor: "Cursor",
+  copilot: "GitHub Copilot",
+  claude: "Claude",
+  chatgpt: "ChatGPT",
+  api_anthropic_sonnet: "Anthropic API (Claude Sonnet 4)",
+  api_openai_gpt5_4: "OpenAI API (GPT-5.4)",
+  api_gemini_3_pro: "Gemini API (Gemini 2.5 Pro)",
+};
+
+const SUBSCRIPTION_PRICING: Record<string, Record<string, SubscriptionPlanPrice>> = {
   cursor: {
-    pro: { price: 20, billing: "flat" },
-    teams: { price: 40, billing: "per_seat" },
+    pro: { priceInInr: 1887.4, billing: "flat" },
+    teams: { priceInInr: 3774.8, billing: "per_seat" },
   },
   copilot: {
-    individual: { price: 10, billing: "flat" },
-    business: { price: 19, billing: "per_seat" },
-    enterprise: { price: 39, billing: "per_seat" },
+    individual: { priceInInr: 943.7, billing: "flat" },
+    business: { priceInInr: 1793.03, billing: "per_seat" },
+    enterprise: { priceInInr: 3680.43, billing: "per_seat" },
   },
   claude: {
-    pro: { price: 20, billing: "flat" },
-    team_standard: { price: 30, billing: "per_seat" },
-    team_premium: { price: 150, billing: "per_seat" },
+    pro: { priceInInr: 1887.4, billing: "flat" },
+    team_standard: {
+      priceInInr: 2831.1,
+      annualMonthlyPriceInInr: 2359.25,
+      billing: "per_seat",
+    },
+    team_premium: { priceInInr: 14155.5, billing: "per_seat" },
   },
   chatgpt: {
-    plus: { price: 20, billing: "flat" },
-    pro: { price: 100, billing: "flat" },
-    business: { price: 25, billing: "per_seat" },
-  },
-  api_anthropic_sonnet: {
-    input: 3.0, // per 1M tokens
-    output: 15.0, // per 1M tokens
-  },
-  api_openai_gpt5_4: {
-    input: 2.5, // per 1M tokens
-    output: 15.0, // per 1M tokens
-  },
-  api_gemini_3_pro: {
-    input: 4.0, // combined avg per 1M tokens
-    output: 4.0,
+    plus: { priceInInr: 1887.4, billing: "flat" },
+    pro: { priceInInr: 18874, billing: "flat" },
+    business: {
+      priceInInr: 2359.25,
+      annualMonthlyPriceInInr: 1800,
+      billing: "per_seat",
+    },
   },
 };
+
+const API_PRICING: Record<string, ApiModelPrice> = {
+  api_anthropic_sonnet: {
+    inputPerMillionInr: 283.11,
+    outputPerMillionInr: 1415.55,
+  },
+  api_openai_gpt5_4: {
+    inputPerMillionInr: 235.93,
+    outputPerMillionInr: 1415.55,
+  },
+  api_gemini_3_pro: {
+    inputPerMillionInr: 117.96,
+    outputPerMillionInr: 943.7,
+  },
+};
+
+function roundCurrency(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function formatInr(value: number): string {
+  return `Rs ${Math.round(value).toLocaleString("en-IN")}`;
+}
+
+function getToolName(toolSlug: string): string {
+  return TOOL_NAMES[toolSlug] ?? toolSlug.replaceAll("_", " ");
+}
+
+function getSubscriptionPlan(
+  toolSlug: string,
+  planName: string
+): SubscriptionPlanPrice | undefined {
+  return SUBSCRIPTION_PRICING[toolSlug]?.[planName];
+}
+
+function getEffectivePlanPrice(
+  plan: SubscriptionPlanPrice,
+  billingCycle: "monthly" | "annual"
+): number {
+  if (billingCycle === "annual" && plan.annualMonthlyPriceInInr) {
+    return plan.annualMonthlyPriceInInr;
+  }
+
+  return plan.priceInInr;
+}
+
+function calculateSubscriptionCost(
+  toolSlug: string,
+  planName: string,
+  quantity: number,
+  teamSize: number,
+  billingCycle: "monthly" | "annual"
+): number {
+  const plan = getSubscriptionPlan(toolSlug, planName);
+
+  if (!plan) {
+    return 0;
+  }
+
+  const planPrice = getEffectivePlanPrice(plan, billingCycle);
+  const monthlyCost =
+    plan.billing === "per_seat" ? planPrice * teamSize : planPrice * quantity;
+
+  return roundCurrency(monthlyCost);
+}
 
 export async function calculateAudit(
   formData: AuditFormData
 ): Promise<AuditResult> {
+  const teamSize = formData.teamSize ?? 1;
   let totalCurrentMonthlySpend = 0;
   let totalOptimizedMonthlySpend = 0;
   const toolResults: ToolAuditResult[] = [];
   const recommendations: string[] = [];
 
-  const toolSlugs = formData.tools.map((t) => t.toolSlug);
+  const toolSlugs = formData.tools.map((tool) => tool.toolSlug);
 
-  // 1. Process each tool
   for (const tool of formData.tools) {
     let currentCost = 0;
     let optimizedCost = 0;
     let recommendationStr = "";
-    let recommendedPlan = undefined;
+    let recommendedPlan: string | undefined;
     const isApi = tool.toolSlug.startsWith("api_");
 
     if (isApi) {
-      // API Cost Calculation
-      const apiPricing = PRICING_DB[tool.toolSlug as keyof typeof PRICING_DB] as any;
+      const apiPricing = API_PRICING[tool.toolSlug];
+
       if (apiPricing && tool.estimatedMonthlyTokens) {
         const inputCost =
-          (tool.estimatedMonthlyTokens.inputTokens || 0) * apiPricing.input;
+          ((tool.estimatedMonthlyTokens.inputTokens || 0) / MILLION_TOKENS) *
+          apiPricing.inputPerMillionInr;
         const outputCost =
-          (tool.estimatedMonthlyTokens.outputTokens || 0) * apiPricing.output;
-        currentCost = inputCost + outputCost;
+          ((tool.estimatedMonthlyTokens.outputTokens || 0) / MILLION_TOKENS) *
+          apiPricing.outputPerMillionInr;
+
+        currentCost = roundCurrency(inputCost + outputCost);
       }
-      optimizedCost = currentCost; // Baseline API assumes no direct optimization yet without deep caching analysis
+
+      optimizedCost = currentCost;
     } else {
-      // Subscription Cost Calculation
-      const toolPricing = PRICING_DB[tool.toolSlug as keyof typeof PRICING_DB] as any;
-      if (toolPricing && toolPricing[tool.planName]) {
-        const planData = toolPricing[tool.planName];
-        currentCost =
-          planData.billing === "per_seat"
-            ? planData.price * formData.teamSize
-            : planData.price * tool.quantity; // Flat usually means per license/account provided
+      currentCost = calculateSubscriptionCost(
+        tool.toolSlug,
+        tool.planName,
+        tool.quantity,
+        teamSize,
+        tool.billingCycle
+      );
+      optimizedCost = currentCost;
 
-        optimizedCost = currentCost;
+      if (
+        teamSize <= 2 &&
+        ["teams", "business", "team_standard", "team_premium"].includes(
+          tool.planName
+        )
+      ) {
+        let smallerTeamPlan: string | undefined;
+        let smallerTeamMessage = "";
 
-        // Rule 1: Identify "Overkill"
-        if (
-          formData.teamSize <= 2 &&
-          ["teams", "business", "team_standard", "team_premium"].includes(
-            tool.planName
-          )
-        ) {
-          // Suggest downgrading to individual/pro
-          if (tool.toolSlug === "cursor") {
-            optimizedCost = PRICING_DB.cursor.pro.price * formData.teamSize;
-            recommendedPlan = "pro";
-            recommendationStr = `Your team of ${formData.teamSize} is paying for Teams. Switching to Pro saves money with nearly identical features for small teams.`;
-          } else if (tool.toolSlug === "copilot") {
-            optimizedCost = PRICING_DB.copilot.individual.price * formData.teamSize;
-            recommendedPlan = "individual";
-            recommendationStr = `Your team of ${formData.teamSize} is paying for Business. Switching to Individual saves money with nearly identical features for small teams.`;
-          } else if (tool.toolSlug === "claude") {
-            optimizedCost = PRICING_DB.claude.pro.price * formData.teamSize;
-            recommendedPlan = "pro";
-            recommendationStr = `Your team of ${formData.teamSize} is paying for Team. Switching to Pro saves money with nearly identical features for small teams.`;
-          } else if (tool.toolSlug === "chatgpt") {
-            optimizedCost = PRICING_DB.chatgpt.plus.price * formData.teamSize;
-            recommendedPlan = "plus";
-            recommendationStr = `Your team of ${formData.teamSize} is paying for Business. Switching to Plus saves money with nearly identical features for small teams.`;
-          }
+        if (tool.toolSlug === "cursor") {
+          smallerTeamPlan = "pro";
+          smallerTeamMessage =
+            "Small teams usually do not need Cursor Teams features like centralized billing and SSO.";
+        } else if (tool.toolSlug === "copilot") {
+          smallerTeamPlan = "individual";
+          smallerTeamMessage =
+            "Small teams usually get better value from individual Copilot seats than business controls.";
+        } else if (tool.toolSlug === "claude") {
+          smallerTeamPlan = "pro";
+          smallerTeamMessage =
+            "Claude Pro usually covers a two-person team before team-wide admin controls become necessary.";
+        } else if (tool.toolSlug === "chatgpt") {
+          smallerTeamPlan = "plus";
+          smallerTeamMessage =
+            "ChatGPT Plus is often enough for very small teams that do not need workspace controls.";
         }
 
-        // Rule 2: Compare retail vs credits (Saravanakumar 20% discount on Enterprise tiers)
-        if (["enterprise", "team_premium"].includes(tool.planName)) {
-          optimizedCost = currentCost * 0.8;
-          recommendedPlan = `${tool.planName} (Saravanakumar Discount)`;
-          recommendationStr = `Saravanakumar can negotiate a 20% discount on your Enterprise/Premium tiers, saving you significant overhead.`;
-        }
+        if (smallerTeamPlan) {
+          const alternativeCost = calculateSubscriptionCost(
+            tool.toolSlug,
+            smallerTeamPlan,
+            teamSize,
+            teamSize,
+            "monthly"
+          );
 
-        // Rule 3: Suggest alternatives (ChatGPT Pro to Plus)
-        if (tool.toolSlug === "chatgpt" && tool.planName === "pro") {
-          const alternativeCost = PRICING_DB.chatgpt.plus.price * tool.quantity;
           if (alternativeCost < optimizedCost) {
             optimizedCost = alternativeCost;
-            recommendedPlan = "plus";
-            recommendationStr = `Switching from ChatGPT Pro to Plus saves $80/mo per user with minimal impact for mixed use cases.`;
+            recommendedPlan = smallerTeamPlan;
+            recommendationStr = `${smallerTeamMessage} Switching saves about ${formatInr(
+              currentCost - alternativeCost
+            )} every month.`;
           }
+        }
+      }
+
+      if (["enterprise", "team_premium"].includes(tool.planName)) {
+        const negotiatedCost = roundCurrency(currentCost * 0.8);
+
+        if (negotiatedCost < optimizedCost) {
+          optimizedCost = negotiatedCost;
+          recommendedPlan = `${tool.planName} (Saravanakumar Discount)`;
+          recommendationStr =
+            "Saravanakumar can often negotiate enterprise discounts of around 20 percent on premium workspace tiers.";
+        }
+      }
+
+      if (tool.toolSlug === "chatgpt" && tool.planName === "pro") {
+        const alternativeCost = calculateSubscriptionCost(
+          "chatgpt",
+          "plus",
+          tool.quantity,
+          teamSize,
+          "monthly"
+        );
+
+        if (alternativeCost < optimizedCost) {
+          optimizedCost = alternativeCost;
+          recommendedPlan = "plus";
+          recommendationStr = `Switching from ChatGPT Pro to Plus saves about ${formatInr(
+            currentCost - alternativeCost
+          )} per month per user with minimal impact for mixed use cases.`;
         }
       }
     }
 
-    const monthlySavings = currentCost - optimizedCost;
-    const savingsPercentage = currentCost > 0 ? (monthlySavings / currentCost) * 100 : 0;
+    currentCost = roundCurrency(currentCost);
+    optimizedCost = roundCurrency(optimizedCost);
+
+    const monthlySavings = roundCurrency(currentCost - optimizedCost);
+    const savingsPercentage =
+      currentCost > 0 ? (monthlySavings / currentCost) * 100 : 0;
 
     toolResults.push({
       toolSlug: tool.toolSlug,
-      toolName: tool.toolSlug.charAt(0).toUpperCase() + tool.toolSlug.slice(1),
+      toolName: getToolName(tool.toolSlug),
       currentPlan: tool.planName,
       currentMonthlyCost: currentCost,
-      currentMonthlyCostINR: Math.round(currentCost * USD_TO_INR_RATE),
       recommendedPlan,
-      recommendedMonthlyCost: optimizedCost !== currentCost ? optimizedCost : undefined,
-      recommendedMonthlyCostINR: optimizedCost !== currentCost ? Math.round(optimizedCost * USD_TO_INR_RATE) : undefined,
+      recommendedMonthlyCost:
+        optimizedCost !== currentCost ? optimizedCost : undefined,
       monthlySavings,
-      monthlySavingsINR: Math.round(monthlySavings * USD_TO_INR_RATE),
       savingsPercentage,
       reasoning: recommendationStr || "Your current plan is optimal for this tool.",
       isOverlap: false,
@@ -151,39 +277,45 @@ export async function calculateAudit(
 
     totalCurrentMonthlySpend += currentCost;
     totalOptimizedMonthlySpend += optimizedCost;
-    if (recommendationStr) recommendations.push(recommendationStr);
+
+    if (recommendationStr) {
+      recommendations.push(recommendationStr);
+    }
   }
 
-  // Check Overlaps
   const overlaps = detectOverlaps(toolSlugs);
   for (const overlap of overlaps) {
     recommendations.push(overlap.recommendation);
-    // Mark tools as overlapping in the result
     overlap.tools.forEach((slug) => {
-      const tr = toolResults.find((t) => t.toolSlug === slug);
-      if (tr) {
-        tr.isOverlap = true;
-        tr.overlapWith = overlap.tools.filter((s) => s !== slug).join(", ");
+      const toolResult = toolResults.find((result) => result.toolSlug === slug);
+      if (toolResult) {
+        toolResult.isOverlap = true;
+        toolResult.overlapWith = overlap.tools
+          .filter((overlapSlug) => overlapSlug !== slug)
+          .join(", ");
       }
     });
   }
 
-  const totalMonthlySavings = totalCurrentMonthlySpend - totalOptimizedMonthlySpend;
-  const totalAnnualSavings = totalMonthlySavings * 12;
+  totalCurrentMonthlySpend = roundCurrency(totalCurrentMonthlySpend);
+  totalOptimizedMonthlySpend = roundCurrency(totalOptimizedMonthlySpend);
+
+  const totalMonthlySavings = roundCurrency(
+    totalCurrentMonthlySpend - totalOptimizedMonthlySpend
+  );
+  const totalAnnualSavings = roundCurrency(totalMonthlySavings * 12);
   const savingsPercentage =
     totalCurrentMonthlySpend > 0
       ? (totalMonthlySavings / totalCurrentMonthlySpend) * 100
       : 0;
 
   return {
+    currency: "INR",
+    pricingReferenceDate: PRICING_REFERENCE_DATE,
     totalCurrentMonthlySpend,
-    totalCurrentMonthlySpendINR: Math.round(totalCurrentMonthlySpend * USD_TO_INR_RATE),
     totalOptimizedMonthlySpend,
-    totalOptimizedMonthlySpendINR: Math.round(totalOptimizedMonthlySpend * USD_TO_INR_RATE),
     totalMonthlySavings,
-    totalMonthlySavingsINR: Math.round(totalMonthlySavings * USD_TO_INR_RATE),
     totalAnnualSavings,
-    totalAnnualSavingsINR: Math.round(totalAnnualSavings * USD_TO_INR_RATE),
     savingsPercentage,
     toolResults,
     recommendations,
@@ -196,8 +328,8 @@ export function detectOverlaps(
 ): Array<{ tools: string[]; category: string; recommendation: string }> {
   const overlaps = [];
 
-  const ides = ["cursor", "copilot", "windsurf"].filter((t) =>
-    toolSlugs.includes(t)
+  const ides = ["cursor", "copilot", "windsurf"].filter((toolSlug) =>
+    toolSlugs.includes(toolSlug)
   );
   if (ides.length > 1) {
     overlaps.push({
@@ -209,7 +341,9 @@ export function detectOverlaps(
     });
   }
 
-  const chatbots = ["chatgpt", "claude"].filter((t) => toolSlugs.includes(t));
+  const chatbots = ["chatgpt", "claude"].filter((toolSlug) =>
+    toolSlugs.includes(toolSlug)
+  );
   if (chatbots.length > 1) {
     overlaps.push({
       tools: chatbots,

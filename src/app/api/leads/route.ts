@@ -44,9 +44,7 @@ export async function POST(request: NextRequest) {
     const auditResult = await calculateAudit(engineData);
 
     // 5. Store the lead in Supabase
-    const isHighSavings = auditResult.totalMonthlySavings > 500;
-    
-    let auditId = "stub-id-" + Date.now();
+    const auditId = "stub-id-" + Date.now();
 
     /* 
     // Uncomment once Supabase Admin key is fully configured
@@ -59,7 +57,7 @@ export async function POST(request: NextRequest) {
         team_size: formData.teamSize || null,
         input_data: formData.tools,
         total_savings: auditResult.totalMonthlySavings,
-        is_high_savings: isHighSavings,
+        is_high_savings: auditResult.totalMonthlySavings > 47000,
       })
       .select("id")
       .single();

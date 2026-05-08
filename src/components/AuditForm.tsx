@@ -46,7 +46,8 @@ export default function AuditForm() {
 
     setFormData((prev) => ({
       ...prev,
-      [key]: type === "number" ? (value === "" ? "" : Number(value)) : value,
+      [key]:
+        type === "number" ? (value === "" ? undefined : Number(value)) : value,
     }));
   };
 
@@ -54,13 +55,22 @@ export default function AuditForm() {
     setHoneypot(e.target.value);
   };
 
-  const addTool = (toolSlug: string, planName: string, quantity: number, estimatedMonthlyTokens?: { inputTokens: number, outputTokens: number }) => {
+  const addTool = (
+    toolSlug: string,
+    planName: string,
+    quantity: number,
+    estimatedMonthlyTokens?: { inputTokens: number; outputTokens: number },
+    billingCycle: "monthly" | "annual" = "monthly"
+  ) => {
     setFormData((prev) => {
       // Avoid duplicates for MVP
       if (prev.tools.find((t) => t.toolSlug === toolSlug)) return prev;
       return {
         ...prev,
-        tools: [...prev.tools, { toolSlug, planName, quantity, billingCycle: "monthly", estimatedMonthlyTokens }],
+        tools: [
+          ...prev.tools,
+          { toolSlug, planName, quantity, billingCycle, estimatedMonthlyTokens },
+        ],
       };
     });
   };
@@ -98,8 +108,8 @@ export default function AuditForm() {
       
       // Redirect to the dynamic audit result page
       router.push(`/audit/${data.auditId}`);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate audit");
       setIsSubmitting(false);
     }
   };
@@ -259,13 +269,13 @@ export default function AuditForm() {
                   onClick={() => addTool("cursor", "pro", 1)}
                   className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
                 >
-                  Add Pro ($20)
+                  Add Pro (Rs 1,887)
                 </button>
                 <button 
                   onClick={() => addTool("cursor", "teams", formData.teamSize || 1)}
                   className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
                 >
-                  Add Teams ($40/seat)
+                  Add Teams (Rs 3,775/user)
                 </button>
               </div>
             ) : (
@@ -287,19 +297,19 @@ export default function AuditForm() {
                   onClick={() => addTool("copilot", "individual", 1)}
                   className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
                 >
-                  Add Individual ($10)
+                  Add Individual (Rs 944)
                 </button>
                 <button 
                   onClick={() => addTool("copilot", "business", formData.teamSize || 1)}
                   className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
                 >
-                  Add Business ($19/seat)
+                  Add Business (Rs 1,793/user)
                 </button>
                 <button 
                   onClick={() => addTool("copilot", "enterprise", formData.teamSize || 1)}
                   className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
                 >
-                  Add Enterprise ($39/seat)
+                  Add Enterprise (Rs 3,680/user)
                 </button>
               </div>
             ) : (
@@ -321,13 +331,13 @@ export default function AuditForm() {
                   onClick={() => addTool("claude", "pro", 1)}
                   className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
                 >
-                  Add Pro ($20)
+                  Add Pro (Rs 1,887)
                 </button>
                 <button 
                   onClick={() => addTool("claude", "team_standard", formData.teamSize || 1)}
                   className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
                 >
-                  Add Team ($30/seat)
+                  Add Team (Rs 2,831/user)
                 </button>
               </div>
             ) : (
@@ -349,19 +359,27 @@ export default function AuditForm() {
                   onClick={() => addTool("chatgpt", "plus", 1)}
                   className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
                 >
-                  Add Plus ($20)
+                  Add Plus (Rs 1,887)
                 </button>
                 <button 
-                  onClick={() => addTool("chatgpt", "business", formData.teamSize || 1)}
+                  onClick={() =>
+                    addTool(
+                      "chatgpt",
+                      "business",
+                      formData.teamSize || 1,
+                      undefined,
+                      "annual"
+                    )
+                  }
                   className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
                 >
-                  Add Business ($25/seat)
+                  Add Business (Rs 1,800/user annual)
                 </button>
                 <button 
                   onClick={() => addTool("chatgpt", "pro", 1)}
                   className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
                 >
-                  Add Pro ($100)
+                  Add Pro (Rs 18,874)
                 </button>
               </div>
             ) : (
@@ -380,10 +398,15 @@ export default function AuditForm() {
             {!formData.tools.find(t => t.toolSlug === "api_anthropic_sonnet") ? (
               <div className="flex flex-wrap gap-2">
                 <button 
-                  onClick={() => addTool("api_anthropic_sonnet", "api_usage", 1, { inputTokens: 10, outputTokens: 2 })}
+                  onClick={() =>
+                    addTool("api_anthropic_sonnet", "api_usage", 1, {
+                      inputTokens: 10_000_000,
+                      outputTokens: 2_000_000,
+                    })
+                  }
                   className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
                 >
-                  Add Moderate Usage (~$60/mo)
+                  Add Moderate Usage (~Rs 5,662/mo)
                 </button>
               </div>
             ) : (
@@ -402,10 +425,15 @@ export default function AuditForm() {
             {!formData.tools.find(t => t.toolSlug === "api_openai_gpt5_4") ? (
               <div className="flex flex-wrap gap-2">
                 <button 
-                  onClick={() => addTool("api_openai_gpt5_4", "api_usage", 1, { inputTokens: 10, outputTokens: 2 })}
+                  onClick={() =>
+                    addTool("api_openai_gpt5_4", "api_usage", 1, {
+                      inputTokens: 10_000_000,
+                      outputTokens: 2_000_000,
+                    })
+                  }
                   className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
                 >
-                  Add Moderate Usage (~$55/mo)
+                  Add Moderate Usage (~Rs 5,190/mo)
                 </button>
               </div>
             ) : (

@@ -32,7 +32,7 @@
   --info: #38bdf8;                /* Sky 400 */
 
   /* Typography */
-  --font-sans: var(--font-inter), "Inter", system-ui, -apple-system, sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 
   /* Spacing & Radius */
   --radius-sm: 0.375rem;

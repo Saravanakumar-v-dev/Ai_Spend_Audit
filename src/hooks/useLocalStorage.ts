@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 
 /**
  * Custom hook for managing state synchronized with localStorage.
@@ -8,6 +8,12 @@ import { useState, useEffect, useCallback } from "react";
  * @param initialValue The fallback value if no data is stored
  */
 export function useLocalStorage<T>(key: string, initialValue: T) {
+  const isHydrated = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false
+  );
+
   // Pass initial state function to useState so logic is only executed once
   const [storedValue, setStoredValue] = useState<T>(() => {
     if (typeof window === "undefined") {
@@ -21,13 +27,6 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
       return initialValue;
     }
   });
-
-  // State to track if we've hydrated on the client to avoid hydration mismatch
-  const [isHydrated, setIsHydrated] = useState(false);
-
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
 
   // Return a wrapped version of useState's setter function that
   // persists the new value to localStorage.
