@@ -35,10 +35,13 @@ export default async function AuditReportPage({ params }: AuditPageProps) {
   // We use our stateless URL encoding strategy to parse the data from the URL
   let parsedInput: AuditFormData | null = null;
   try {
-    const decoded = Buffer.from(id, 'base64url').toString('utf-8');
+    // Attempt to decode the id parameter. 
+    // This will throw if the ID is an old stub (e.g., 'stub-id-123') or invalid base64.
+    const decoded = Buffer.from(decodeURIComponent(id), 'base64url').toString('utf-8');
     parsedInput = JSON.parse(decoded) as AuditFormData;
   } catch (error) {
-    console.error("Failed to parse audit data from URL", error);
+    // Silently catch to avoid Next.js dev overlay intercepting console.error
+    console.log("Invalid URL payload. Falling back to mock data.");
   }
 
   // Fallback to mock data if someone hits a bad URL directly
