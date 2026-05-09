@@ -180,7 +180,7 @@ export async function calculateAudit(
 
       if (
         teamSize <= 2 &&
-        ["teams", "business", "team_standard", "team_premium"].includes(
+        ["teams", "business", "enterprise", "team_standard", "team_premium"].includes(
           tool.planName
         )
       ) {
@@ -189,20 +189,19 @@ export async function calculateAudit(
 
         if (tool.toolSlug === "cursor") {
           smallerTeamPlan = "pro";
-          smallerTeamMessage =
-            "Small teams usually do not need Cursor Teams features like centralized billing and SSO.";
-        } else if (tool.toolSlug === "copilot") {
+          smallerTeamMessage = `Switching from Cursor Teams to Pro saves ${formatInr(getEffectivePlanPrice(SUBSCRIPTION_PRICING.cursor.teams, "monthly") - getEffectivePlanPrice(SUBSCRIPTION_PRICING.cursor.pro, "monthly"))}/seat with no loss of core coding functionality for a team of your size.`;
+        } else if (tool.toolSlug === "copilot" && tool.planName === "enterprise") {
+          smallerTeamPlan = "business";
+          smallerTeamMessage = `Switching from GitHub Copilot Enterprise to Business saves ${formatInr(getEffectivePlanPrice(SUBSCRIPTION_PRICING.copilot.enterprise, "monthly") - getEffectivePlanPrice(SUBSCRIPTION_PRICING.copilot.business, "monthly"))}/seat with no loss of core coding functionality for a team of your size.`;
+        } else if (tool.toolSlug === "copilot" && tool.planName === "business") {
           smallerTeamPlan = "individual";
-          smallerTeamMessage =
-            "Small teams usually get better value from individual Copilot seats than business controls.";
+          smallerTeamMessage = `Switching from GitHub Copilot Business to Individual saves ${formatInr(getEffectivePlanPrice(SUBSCRIPTION_PRICING.copilot.business, "monthly") - getEffectivePlanPrice(SUBSCRIPTION_PRICING.copilot.individual, "monthly"))}/seat with no loss of core coding functionality for a team of your size.`;
         } else if (tool.toolSlug === "claude") {
           smallerTeamPlan = "pro";
-          smallerTeamMessage =
-            "Claude Pro usually covers a two-person team before team-wide admin controls become necessary.";
+          smallerTeamMessage = `Switching from Claude Team to Pro saves ${formatInr(getEffectivePlanPrice(SUBSCRIPTION_PRICING.claude.team_standard, "monthly") - getEffectivePlanPrice(SUBSCRIPTION_PRICING.claude.pro, "monthly"))}/seat by eliminating unnecessary workspace administration overhead.`;
         } else if (tool.toolSlug === "chatgpt") {
           smallerTeamPlan = "plus";
-          smallerTeamMessage =
-            "ChatGPT Plus is often enough for very small teams that do not need workspace controls.";
+          smallerTeamMessage = `Switching from ChatGPT Business to Plus saves ${formatInr(getEffectivePlanPrice(SUBSCRIPTION_PRICING.chatgpt.business, "monthly") - getEffectivePlanPrice(SUBSCRIPTION_PRICING.chatgpt.plus, "monthly"))}/seat by removing enterprise controls you do not need yet.`;
         }
 
         if (smallerTeamPlan) {
@@ -217,9 +216,7 @@ export async function calculateAudit(
           if (alternativeCost < optimizedCost) {
             optimizedCost = alternativeCost;
             recommendedPlan = smallerTeamPlan;
-            recommendationStr = `${smallerTeamMessage} Switching saves about ${formatInr(
-              currentCost - alternativeCost
-            )} every month.`;
+            recommendationStr = smallerTeamMessage;
           }
         }
       }
@@ -231,7 +228,7 @@ export async function calculateAudit(
           optimizedCost = negotiatedCost;
           recommendedPlan = `${tool.planName} (Saravanakumar Discount)`;
           recommendationStr =
-            "Saravanakumar can often negotiate enterprise discounts of around 20 percent on premium workspace tiers.";
+            "Saravanakumar can explicitly negotiate enterprise discounts of around 20% on premium workspace tiers based on volume.";
         }
       }
 

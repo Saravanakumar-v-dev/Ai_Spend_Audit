@@ -145,4 +145,49 @@ describe("Audit Engine calculateAudit", () => {
     expect(result.totalCurrentMonthlySpend).toBeCloseTo(5190.4, 2);
     expect(result.toolResults[0].toolName).toBe("OpenAI API (GPT-5.4)");
   });
+
+  it("handles a user on all the most expensive tiers with only 1 seat", async () => {
+    const input: AuditFormData = {
+      companyName: "MoneyBurner",
+      teamSize: 1,
+      email: "burn@money.com",
+      tools: [
+        { toolSlug: "cursor", planName: "teams", quantity: 1, billingCycle: "monthly" },
+        { toolSlug: "copilot", planName: "enterprise", quantity: 1, billingCycle: "monthly" },
+        { toolSlug: "claude", planName: "team_premium", quantity: 1, billingCycle: "monthly" },
+        { toolSlug: "chatgpt", planName: "pro", quantity: 1, billingCycle: "monthly" },
+      ],
+    };
+
+    const result = await calculateAudit(input);
+
+    expect(result.totalCurrentMonthlySpend).toBeGreaterThan(result.totalOptimizedMonthlySpend);
+    expect(result.totalMonthlySavings).toBeGreaterThan(0);
+    // Should downgrade all of them
+    expect(result.toolResults.find(t => t.toolSlug === "cursor")?.recommendedPlan).toBe("pro");
+    expect(result.toolResults.find(t => t.toolSlug === "copilot")?.recommendedPlan).toBe("business");
+    // Wait, Claude Team Premium is an enterprise tier, so it might just get the 20% discount or downgraded to Pro?
+    // Rule: if teamSize <=2 and in ["teams", "business", "enterprise", "team_standard", "team_premium"], claude downgrades to pro.
+    expect(result.toolResults.find(t => t.toolSlug === "claude")?.recommendedPlan).toBe("pro");
+    expect(result.toolResults.find(t => t.toolSlug === "chatgpt")?.recommendedPlan).toBe("plus");
+  });
+
+  it("handles a user who is already perfectly optimized", async () => {
+    const input: AuditFormData = {
+      companyName: "LeanStartup",
+      teamSize: 1,
+      email: "lean@startup.com",
+      tools: [
+        { toolSlug: "cursor", planName: "pro", quantity: 1, billingCycle: "monthly" },
+      ],
+    };
+
+    const result = await calculateAudit(input);
+
+    expect(result.totalCurrentMonthlySpend).toBe(1887.4);
+    expect(result.totalOptimizedMonthlySpend).toBe(1887.4);
+    expect(result.totalMonthlySavings).toBe(0);
+    expect(result.savingsPercentage).toBe(0);
+    expect(result.toolResults[0].recommendedPlan).toBeUndefined();
+  });
 });

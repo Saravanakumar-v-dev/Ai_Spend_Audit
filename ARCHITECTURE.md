@@ -145,6 +145,25 @@ sequenceDiagram
     Note over U,R: User can now share this URL with their team.<br/>Subsequent visits are served from ISR cache.
 ```
 
+## 4b. Results UI & Honesty Filter Flow
+
+```mermaid
+graph TD
+    A[Form Input] -->|POST /api/leads| B(calculateAudit Logic)
+    B --> C{Total Monthly Savings}
+    C -->|< Rs 8,350| D[Honesty Filter]
+    D -->|Render| E["You're spending well" + Email Capture]
+    C -->|> Rs 41,750| F[High-Savings Filter]
+    F -->|Render| G["Book a Credex Consultation" CTA]
+    C -->|Normal Range| H[Standard Render]
+    H -->|Render| I[Line-Item Analysis Breakdown]
+```
+
+---
+
+## 4c. Engine Design: Deterministic Rules vs LLMs
+I chose deterministic hardcoded rules for the audit math because LLMs hallucinate numbers, and financial advice must be 100% predictable. A CFO or founder reviewing their spend audit expects precise, repeatable mathematics based on exact, verified pricing tiers. Using an LLM to generate the savings estimates introduces unacceptable non-determinism, potentially hallucinating fake tiers or incorrect exchange rates, which would destroy the credibility of the tool.
+
 ---
 
 ## 5. Database Schema (Supabase / PostgreSQL)

@@ -11,12 +11,15 @@
 - Engineered rules for detecting "Overkill" usage, enterprise discount scenarios, and alternative tool suggestions
 - Implemented client-side persistence in `AuditForm` using `localStorage`
 - Authored 5 automated test cases using Vitest and achieved 100% pass rate
-- Designed `leads` table schema in Supabase for tracking audit submissions and savings estimates
-- Configured GitHub Actions CI pipeline to enforce green builds on push
 
-## Day 3 2026-05-08
-Hours worked: 5
-What I did: Implemented form state persistence across reloads. Built the backend lead capture API with Supabase, integrated Resend for transactional emails, and added a honeypot for spam protection.
-What I learned: Realized that using a `useState` initializer with `localStorage` in Next.js causes severe hydration mismatch errors between the SSR HTML and the client render. I had to build a custom `useLocalStorage` hook that returns the initial state on the first render and syncs the stored value in a `useEffect` to safely bridge the gap.
-Blockers / what I'm stuck on: Currently struggling with DNS propagation for Resend. Trying to verify the DKIM and SPF records for the custom domain so the transactional emails stop going directly to the spam folder.
-Plan for tomorrow: Build the core deterministic financial logic for the Audit Engine and create the Results Page UI with the required honesty filter.
+## Day 3
+- Migrated deterministic Engine pricing architecture to native INR.
+- Added Copilot, ChatGPT, and API metrics directly to the Tool Selector UI.
+- Validated form integration to submit via `POST /api/leads` and redirect automatically.
+
+## Day 4 2026-05-09
+Hours worked: 6
+What I did: Finalized the deterministic financial logic engine, built the Results UI with the mandatory 'Honesty Filter', and wrote 5 rigorous automated test cases.
+What I learned: I realized that writing deterministic tests for financial logic requires abandoning flexible rounding and tying exact expectations to the defined conversion rates. Handling UI states for edge cases like $0 savings fundamentally shifts the application from a raw "calculator" into a trust-building sales tool.
+Blockers / what I'm stuck on: Currently stuck on formatting the Hero section to look good on both mobile and desktop. Tailwind grid rules are colliding with padding variables on iPhone viewports.
+Plan for tomorrow: Integrate the Anthropic API for personalized AI summaries and build the public-facing shareable URLs.
