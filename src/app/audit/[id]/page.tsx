@@ -32,11 +32,17 @@ export const revalidate = 3600;
 export default async function AuditReportPage({ params }: AuditPageProps) {
   const { id } = await params;
 
-  // In production, we would fetch from Supabase:
-  // const { data } = await supabaseAdmin.from('audits').select('*').eq('id', id).single();
-  
-  // For MVP UI building, we simulate an audit result if DB fails or is stubbed:
-  const mockInput: AuditFormData = {
+  // We use our stateless URL encoding strategy to parse the data from the URL
+  let parsedInput: AuditFormData | null = null;
+  try {
+    const decoded = Buffer.from(id, 'base64url').toString('utf-8');
+    parsedInput = JSON.parse(decoded) as AuditFormData;
+  } catch (error) {
+    console.error("Failed to parse audit data from URL", error);
+  }
+
+  // Fallback to mock data if someone hits a bad URL directly
+  const inputData = parsedInput || {
     companyName: "Acme Corp",
     teamSize: 5,
     email: "founder@acmecorp.com",
@@ -46,7 +52,7 @@ export default async function AuditReportPage({ params }: AuditPageProps) {
     ]
   };
   
-  const result = await calculateAudit(mockInput);
+  const result = await calculateAudit(inputData);
 
   const totalMonthlySavings = result.totalMonthlySavings;
   const totalAnnualSavings = result.totalAnnualSavings;

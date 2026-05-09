@@ -43,8 +43,9 @@ export async function POST(request: NextRequest) {
     const engineData = { ...formData, teamSize: formData.teamSize || 1 };
     const auditResult = await calculateAudit(engineData);
 
-    // 5. Store the lead in Supabase
-    const auditId = "stub-id-" + Date.now();
+    // 5. Store the lead in Supabase or encode statelessly for MVP
+    // We encode the data into a base64url string to make the URL shareable without a DB!
+    const auditId = Buffer.from(JSON.stringify(engineData)).toString('base64url');
 
     /* 
     // Uncomment once Supabase Admin key is fully configured
