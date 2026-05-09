@@ -35,14 +35,23 @@ export const metadata: Metadata = {
   },
 };
 
+import { Outfit } from "next/font/google";
+
+const outfit = Outfit({ 
+  subsets: ["latin"],
+  variable: "--font-outfit",
+});
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className={`h-full antialiased ${outfit.variable}`}>
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
+        {/* Dynamic background effect */}
+        <div className="fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-accent-primary/20 via-background to-background"></div>
         {children}
       </body>
     </html>

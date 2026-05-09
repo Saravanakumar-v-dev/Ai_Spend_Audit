@@ -19,9 +19,9 @@ export default function HomePage() {
           </span>
           <a
             href="#audit-form"
-            className="rounded-lg bg-accent-primary/10 px-4 py-2 text-sm font-medium text-accent-primary transition-colors hover:bg-accent-primary/20"
+            className="rounded-full bg-accent-primary/10 px-5 py-2.5 text-sm font-semibold text-accent-primary transition-all duration-300 hover:bg-accent-primary hover:text-white hover:shadow-[0_0_20px_var(--accent-glow)] hover:-translate-y-0.5"
           >
-            Start Audit →
+            Start Free Audit →
           </a>
         </div>
       </nav>
