@@ -156,12 +156,29 @@ export async function calculateAudit(
     if (isApi) {
       const apiPricing = API_PRICING[tool.toolSlug];
 
-      if (apiPricing && tool.estimatedMonthlyTokens) {
+      if (apiPricing) {
+        // Fallback to moderate usage if tokens aren't provided by the frontend
+        let inputTokens = tool.estimatedMonthlyTokens?.inputTokens;
+        let outputTokens = tool.estimatedMonthlyTokens?.outputTokens;
+        
+        if (!inputTokens && !outputTokens) {
+          if (tool.toolSlug === "api_anthropic_sonnet") {
+            inputTokens = 10 * MILLION_TOKENS;
+            outputTokens = 2 * MILLION_TOKENS;
+          } else if (tool.toolSlug === "api_openai_gpt5_4") {
+            inputTokens = 10 * MILLION_TOKENS;
+            outputTokens = 2 * MILLION_TOKENS;
+          } else {
+            inputTokens = 10 * MILLION_TOKENS;
+            outputTokens = 2 * MILLION_TOKENS;
+          }
+        }
+
         const inputCost =
-          ((tool.estimatedMonthlyTokens.inputTokens || 0) / MILLION_TOKENS) *
+          ((inputTokens || 0) / MILLION_TOKENS) *
           apiPricing.inputPerMillionInr;
         const outputCost =
-          ((tool.estimatedMonthlyTokens.outputTokens || 0) / MILLION_TOKENS) *
+          ((outputTokens || 0) / MILLION_TOKENS) *
           apiPricing.outputPerMillionInr;
 
         currentCost = roundCurrency(inputCost + outputCost);
@@ -283,6 +300,10 @@ export async function calculateAudit(
   const overlaps = detectOverlaps(toolSlugs);
   for (const overlap of overlaps) {
     recommendations.push(overlap.recommendation);
+    
+    // Keep the first tool, suggest cancelling the rest
+    const toolsToCancel = overlap.tools.slice(1);
+    
     overlap.tools.forEach((slug) => {
       const toolResult = toolResults.find((result) => result.toolSlug === slug);
       if (toolResult) {
@@ -290,6 +311,18 @@ export async function calculateAudit(
         toolResult.overlapWith = overlap.tools
           .filter((overlapSlug) => overlapSlug !== slug)
           .join(", ");
+          
+        if (toolsToCancel.includes(slug)) {
+          const previousOptimized = toolResult.recommendedMonthlyCost ?? toolResult.currentMonthlyCost;
+          
+          toolResult.recommendedPlan = "Cancel / Consolidate";
+          toolResult.recommendedMonthlyCost = 0;
+          toolResult.monthlySavings = toolResult.currentMonthlyCost;
+          toolResult.savingsPercentage = 100;
+          toolResult.reasoning = `Consolidate AI tools. You can cancel this to save ${formatInr(toolResult.currentMonthlyCost)}/mo.`;
+          
+          totalOptimizedMonthlySpend -= previousOptimized;
+        }
       }
     });
   }
