@@ -35,12 +35,32 @@ export const metadata: Metadata = {
   },
 };
 
-import { Outfit } from "next/font/google";
+import { Outfit, Poppins, Space_Grotesk, Inter } from "next/font/google";
 
 const outfit = Outfit({ 
   subsets: ["latin"],
   variable: "--font-outfit",
-  display: "swap", // Lighthouse: prevents invisible text during font load (FOIT)
+  display: "swap",
+});
+
+const poppins = Poppins({
+  weight: ["300", "400", "500", "600", "700", "800"],
+  subsets: ["latin"],
+  variable: "--font-poppins",
+  display: "swap",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  weight: ["400", "500", "600", "700"],
+  subsets: ["latin"],
+  variable: "--font-space-grotesk",
+  display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
 });
 
 export default function RootLayout({
@@ -49,7 +69,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`h-full antialiased ${outfit.variable}`}>
+    <html lang="en" className={`${outfit.variable} ${poppins.variable} ${spaceGrotesk.variable} ${inter.variable}`}>
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
         {/* Dynamic background effect */}
         <div className="fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-accent-primary/20 via-background to-background"></div>
