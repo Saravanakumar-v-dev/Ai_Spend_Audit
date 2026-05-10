@@ -11,6 +11,7 @@ import { notFound } from "next/navigation";
 // For MVP, we use a mocked data fallback so the UI works 
 // even if the database is not fully connected with Service Keys.
 import { calculateAudit } from "@/lib/audit-engine";
+import { generateAISummary } from "@/lib/ai-summary";
 import { AuditFormData } from "@/lib/validators";
 
 interface AuditPageProps {
@@ -56,6 +57,7 @@ export default async function AuditReportPage({ params }: AuditPageProps) {
   };
   
   const result = await calculateAudit(inputData);
+  const aiSummary = await generateAISummary(result);
 
   const totalMonthlySavings = result.totalMonthlySavings;
   const totalAnnualSavings = result.totalAnnualSavings;
@@ -74,9 +76,17 @@ export default async function AuditReportPage({ params }: AuditPageProps) {
           <Link href="/" className="text-xl font-bold gradient-text">
             Saravanakumar AI Audit
           </Link>
-          <span className="text-sm text-foreground/50">
-            Report ID: {id.slice(0, 8)}
-          </span>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/share/${id}`}
+              className="rounded-full bg-surface-elevated px-4 py-2 text-sm font-medium text-foreground/70 transition-all duration-300 hover:bg-accent-primary/20 hover:text-accent-primary border border-border"
+            >
+              Share Report ↗
+            </Link>
+            <span className="text-sm text-foreground/50">
+              Report ID: {id.slice(0, 8)}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -87,8 +97,8 @@ export default async function AuditReportPage({ params }: AuditPageProps) {
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
             Your AI Spend Analysis
           </h1>
-          <p className="text-lg text-foreground/60 max-w-2xl mx-auto">
-            Based on our May 2026 pricing benchmarks, here is the objective breakdown of your stack's financial efficiency.
+          <p className="text-lg text-foreground/60 max-w-2xl mx-auto leading-relaxed">
+            {aiSummary}
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8">

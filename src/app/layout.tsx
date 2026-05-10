@@ -40,6 +40,7 @@ import { Outfit } from "next/font/google";
 const outfit = Outfit({ 
   subsets: ["latin"],
   variable: "--font-outfit",
+  display: "swap", // Lighthouse: prevents invisible text during font load (FOIT)
 });
 
 export default function RootLayout({

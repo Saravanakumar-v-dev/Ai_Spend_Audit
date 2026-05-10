@@ -12,7 +12,7 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-background">
       {/* Navigation */}
-      <nav className="border-b border-border/50 px-6 py-4">
+      <nav className="border-b border-border/50 px-6 py-4" aria-label="Main navigation">
         <div className="mx-auto max-w-5xl flex items-center justify-between">
           <span className="text-lg font-bold gradient-text">
             Saravanakumar
@@ -27,7 +27,7 @@ export default function HomePage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative px-6 pt-20 pb-16 sm:pt-28 sm:pb-20">
+      <section className="relative px-6 pt-20 pb-16 sm:pt-28 sm:pb-20" aria-labelledby="hero-title">
         {/* Background glow */}
         <div
           className="absolute inset-0 -z-10"
@@ -46,7 +46,7 @@ export default function HomePage() {
             Free for startups — no credit card required
           </div>
 
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
+          <h1 id="hero-title" className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
             Your team is{" "}
             <span className="gradient-text">overspending</span>
             <br />
@@ -88,9 +88,9 @@ export default function HomePage() {
       </section>
 
       {/* What We Analyze */}
-      <section className="px-6 py-16 sm:py-20">
+      <section className="px-6 py-16 sm:py-20" aria-labelledby="analyze-title">
         <div className="mx-auto max-w-4xl">
-          <h2 className="text-2xl sm:text-3xl font-bold text-foreground text-center mb-4">
+          <h2 id="analyze-title" className="text-2xl sm:text-3xl font-bold text-foreground text-center mb-4">
             We analyze your entire AI stack
           </h2>
           <p className="text-center text-foreground/50 mb-12 max-w-lg mx-auto">
@@ -137,9 +137,9 @@ export default function HomePage() {
       </section>
 
       {/* Audit Form Section */}
-      <section className="px-6 py-16 sm:py-20 bg-surface/30">
+      <section className="px-6 py-16 sm:py-20 bg-surface/30" aria-labelledby="form-title">
         <div className="mx-auto max-w-lg">
-          <h2 className="text-2xl sm:text-3xl font-bold text-foreground text-center mb-2">
+          <h2 id="form-title" className="text-2xl sm:text-3xl font-bold text-foreground text-center mb-2">
             Start your free audit
           </h2>
           <p className="text-center text-foreground/50 mb-8">
