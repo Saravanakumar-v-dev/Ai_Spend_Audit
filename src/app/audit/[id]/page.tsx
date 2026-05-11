@@ -2,17 +2,20 @@
  * Audit Report Page - /audit/[id]
  *
  * Server-rendered page for the personalized audit report.
+ * Includes visual savings chart, line-item breakdown with current costs,
+ * and copy/share functionality.
  */
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 
 // For MVP, we use a mocked data fallback so the UI works 
 // even if the database is not fully connected with Service Keys.
 import { calculateAudit } from "@/lib/audit-engine";
 import { generateAISummary } from "@/lib/ai-summary";
 import { AuditFormData } from "@/lib/validators";
+import SavingsChart from "@/components/SavingsChart";
+import CopyLinkButton from "@/components/CopyLinkButton";
 
 interface AuditPageProps {
   params: Promise<{ id: string }>;
@@ -69,23 +72,32 @@ export default async function AuditReportPage({ params }: AuditPageProps) {
   const isPerfectlyOptimized = totalMonthlySavings < HONESTY_THRESHOLD_INR;
   const isHighSavings = totalMonthlySavings > HIGH_SAVINGS_THRESHOLD_INR;
 
+  // Prepare chart data
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+  const shareUrl = `${baseUrl}/share/${id}`;
+
+  const toolBreakdowns = result.toolResults.map((t) => ({
+    toolName: t.toolName,
+    currentCost: t.currentMonthlyCost,
+    optimizedCost: t.recommendedMonthlyCost ?? t.currentMonthlyCost,
+    savings: t.monthlySavings,
+  }));
+
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border bg-surface px-6 py-4">
+      <header className="border-b border-border bg-surface/80 backdrop-blur-md px-6 py-4 sticky top-0 z-50">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <Link href="/" className="text-xl font-bold gradient-text">
             Saravanakumar AI Audit
           </Link>
           <div className="flex items-center gap-3">
+            <CopyLinkButton url={shareUrl} label="Copy Link" />
             <Link
               href={`/share/${id}`}
               className="rounded-full bg-surface-elevated px-4 py-2 text-sm font-medium text-foreground/70 transition-all duration-300 hover:bg-accent-primary/20 hover:text-accent-primary border border-border"
             >
               Share Report ↗
             </Link>
-            <span className="text-sm text-foreground/50">
-              Report ID: {id.slice(0, 8)}
-            </span>
           </div>
         </div>
       </header>
@@ -105,19 +117,19 @@ export default async function AuditReportPage({ params }: AuditPageProps) {
             <div className="glass rounded-2xl p-8 border border-border">
               <p className="text-sm font-medium text-foreground/50 uppercase tracking-wider mb-2">Current Monthly</p>
               <p className="text-4xl font-bold text-danger">
-                Rs {result.totalCurrentMonthlySpend.toLocaleString('en-IN')}
+                Rs {Math.round(result.totalCurrentMonthlySpend).toLocaleString('en-IN')}
               </p>
             </div>
             <div className="glass rounded-2xl p-8 border border-border ring-2 ring-accent-primary/20">
               <p className="text-sm font-medium text-accent-primary uppercase tracking-wider mb-2">Monthly Savings</p>
               <p className="text-4xl font-bold text-accent-primary">
-                Rs {totalMonthlySavings.toLocaleString('en-IN')}
+                Rs {Math.round(totalMonthlySavings).toLocaleString('en-IN')}
               </p>
             </div>
             <div className="glass rounded-2xl p-8 border border-border">
               <p className="text-sm font-medium text-success uppercase tracking-wider mb-2">Annual Savings</p>
               <p className="text-4xl font-bold text-success">
-                Rs {totalAnnualSavings.toLocaleString('en-IN')}
+                Rs {Math.round(totalAnnualSavings).toLocaleString('en-IN')}
               </p>
             </div>
           </div>
@@ -161,25 +173,43 @@ export default async function AuditReportPage({ params }: AuditPageProps) {
           </section>
         ) : null}
 
+        {/* SAVINGS CHART */}
+        {result.toolResults.length > 0 && (
+          <SavingsChart
+            currentSpend={result.totalCurrentMonthlySpend}
+            optimizedSpend={result.totalOptimizedMonthlySpend}
+            savings={totalMonthlySavings}
+            toolBreakdowns={toolBreakdowns}
+          />
+        )}
+
         {/* DETAILED BREAKDOWN */}
         <section className="space-y-6">
           <h3 className="text-2xl font-bold">Line-Item Analysis</h3>
           <div className="space-y-4">
             {result.toolResults.map((tool, idx) => (
               <div key={idx} className="glass p-6 rounded-xl border border-border flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
-                <div>
+                <div className="min-w-[160px]">
                   <h4 className="font-bold text-lg">{tool.toolName}</h4>
-                  <p className="text-sm text-foreground/50">Current: {tool.currentPlan}</p>
+                  <p className="text-sm text-foreground/50">Plan: {tool.currentPlan}</p>
+                  <p className="text-sm text-foreground/60 font-semibold mt-1">
+                    Rs {Math.round(tool.currentMonthlyCost).toLocaleString('en-IN')}/mo
+                  </p>
                 </div>
                 
                 <div className="flex-1 max-w-xl text-sm bg-background/50 p-4 rounded-lg border border-border/50">
                   <p className="font-medium text-foreground/80">{tool.reasoning}</p>
+                  {tool.toolSlug.startsWith("api_") && !tool.reasoning.includes("token") && (
+                    <p className="text-xs text-foreground/40 mt-2 italic">
+                      * Estimated based on moderate API usage (~10M input, ~2M output tokens/mo)
+                    </p>
+                  )}
                 </div>
 
-                <div className="text-right min-w-[120px]">
+                <div className="text-right min-w-[130px]">
                   <p className="text-sm text-foreground/50">Potential Savings</p>
                   <p className={`font-bold text-lg ${tool.monthlySavings > 0 ? 'text-accent-primary' : 'text-foreground/30'}`}>
-                    {tool.monthlySavings > 0 ? `+ Rs ${tool.monthlySavings.toLocaleString('en-IN')}/mo` : 'Optimized'}
+                    {tool.monthlySavings > 0 ? `+ Rs ${Math.round(tool.monthlySavings).toLocaleString('en-IN')}/mo` : 'Optimized'}
                   </p>
                 </div>
               </div>
@@ -187,6 +217,27 @@ export default async function AuditReportPage({ params }: AuditPageProps) {
           </div>
         </section>
 
+        {/* Recommendations */}
+        {result.recommendations.length > 0 && (
+          <section className="glass rounded-2xl p-8 border border-accent-secondary/20 space-y-4">
+            <h3 className="text-2xl font-bold flex items-center gap-2">
+              <span>💡</span> Recommendations
+            </h3>
+            <ul className="space-y-3">
+              {result.recommendations.map((rec, idx) => (
+                <li key={idx} className="flex items-start gap-3 text-foreground/80 text-sm">
+                  <span className="text-accent-primary font-bold mt-0.5">→</span>
+                  <span>{rec}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* Pricing disclaimer */}
+        <p className="text-center text-xs text-foreground/30 font-inter">
+          All prices verified as of {result.pricingReferenceDate}. Calculations are 100% deterministic — no AI guesswork on the numbers.
+        </p>
       </div>
     </main>
   );

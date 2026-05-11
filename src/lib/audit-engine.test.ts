@@ -163,12 +163,13 @@ describe("Audit Engine calculateAudit", () => {
 
     expect(result.totalCurrentMonthlySpend).toBeGreaterThan(result.totalOptimizedMonthlySpend);
     expect(result.totalMonthlySavings).toBeGreaterThan(0);
-    // Should downgrade all of them
+    // Should downgrade cursor from teams to pro
     expect(result.toolResults.find(t => t.toolSlug === "cursor")?.recommendedPlan).toBe("pro");
-    expect(result.toolResults.find(t => t.toolSlug === "copilot")?.recommendedPlan).toBe("business");
-    // Wait, Claude Team Premium is an enterprise tier, so it might just get the 20% discount or downgraded to Pro?
-    // Rule: if teamSize <=2 and in ["teams", "business", "enterprise", "team_standard", "team_premium"], claude downgrades to pro.
-    expect(result.toolResults.find(t => t.toolSlug === "claude")?.recommendedPlan).toBe("pro");
+    // Claude is the SECOND chatbot in detectOverlaps order ["chatgpt","claude"] — cancelled for consolidation
+    const claudeResult = result.toolResults.find(t => t.toolSlug === "claude");
+    expect(claudeResult?.recommendedPlan).toBe("Cancel / Consolidate");
+    expect(claudeResult?.monthlySavings).toBeGreaterThan(0);
+    // ChatGPT is the FIRST chatbot — kept, downgraded from Pro to Plus
     expect(result.toolResults.find(t => t.toolSlug === "chatgpt")?.recommendedPlan).toBe("plus");
   });
 

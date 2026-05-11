@@ -22,6 +22,12 @@ export async function sendAuditEmail(
   auditResult: AuditResult,
   auditUrl: string
 ): Promise<void> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("[email] ⚠️ RESEND_API_KEY not set — skipping email delivery.");
+    console.log(`[email] Would have sent audit to ${toEmail} | Savings: Rs ${Math.round(auditResult.totalMonthlySavings).toLocaleString("en-IN")}/mo | URL: ${auditUrl}`);
+    return;
+  }
+
   // Stub implementation for Day 3 requirement
   console.log(`[EMAIL STUB] Sending Audit Email to ${toEmail}`);
   console.log(

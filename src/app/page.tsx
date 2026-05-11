@@ -177,12 +177,12 @@ export default function HomePage() {
         <div className="mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-foreground/50 font-inter">
           <span>© 2026 Saravanakumar. All rights reserved.</span>
           <div className="flex gap-8">
-            <a href="#" className="hover:text-foreground transition-colors duration-300 hover:gradient-text">
+            <span className="text-foreground/30 cursor-default" title="Privacy policy coming soon">
               Privacy
-            </a>
-            <a href="#" className="hover:text-foreground transition-colors duration-300 hover:gradient-text">
+            </span>
+            <span className="text-foreground/30 cursor-default" title="Terms of service coming soon">
               Terms
-            </a>
+            </span>
             <a
               href="https://saravanakumar.com"
               target="_blank"

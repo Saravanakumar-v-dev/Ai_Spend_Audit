@@ -1,77 +1,150 @@
 /**
- * SavingsChart — Placeholder Component with Enhanced Styling
+ * SavingsChart — Visual Breakdown Component
  *
- * Will render a visual breakdown of current spend vs. optimized spend.
- * Planned implementation: Recharts bar/donut chart.
- *
- * NOTE: Placeholder — requires audit engine output data to render.
+ * Renders a CSS-only bar chart comparing current spend vs. optimized
+ * spend per tool. No external chart library required.
  */
 
+"use client";
+
+interface ToolBreakdown {
+  toolName: string;
+  currentCost: number;
+  optimizedCost: number;
+  savings: number;
+}
+
 interface SavingsChartProps {
-  currentSpend?: number;
-  optimizedSpend?: number;
-  savings?: number;
+  currentSpend: number;
+  optimizedSpend: number;
+  savings: number;
+  toolBreakdowns: ToolBreakdown[];
 }
 
 export default function SavingsChart({
-  currentSpend = 0,
-  optimizedSpend = 0,
-  savings = 0,
+  currentSpend,
+  optimizedSpend,
+  savings,
+  toolBreakdowns,
 }: SavingsChartProps) {
-  void currentSpend;
-  void optimizedSpend;
-  void savings;
+  const maxCost = Math.max(
+    ...toolBreakdowns.map((t) => t.currentCost),
+    1 // prevent division by zero
+  );
+
+  const savingsPercent =
+    currentSpend > 0 ? Math.round((savings / currentSpend) * 100) : 0;
 
   return (
-    <div className="glass-elevated rounded-2xl p-8 border border-accent-primary/20 group card-hover">
-      <h3 className="text-2xl font-bold text-foreground mb-2 font-display">
-        💰 Spend Breakdown
-      </h3>
+    <div className="glass-elevated rounded-2xl p-8 border border-accent-primary/20">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-2xl font-bold text-foreground font-display">
+          💰 Spend Breakdown
+        </h3>
+        {savingsPercent > 0 && (
+          <span className="text-sm font-bold text-accent-primary bg-accent-primary/10 px-3 py-1 rounded-full border border-accent-primary/20">
+            {savingsPercent}% savings potential
+          </span>
+        )}
+      </div>
       <p className="text-sm text-foreground/60 mb-8 font-inter">
-        Visualizing your current vs. optimized spending patterns
+        Current spend vs. optimized — per tool
       </p>
-      
-      <div className="flex flex-col items-center justify-center py-16 text-foreground/30">
-        {/* Animated chart placeholder */}
-        <div className="relative w-48 h-48 mb-6">
-          <div className="absolute inset-0 rounded-full border-8 border-border/40 animate-spin-slow" />
-          <div className="absolute inset-2 rounded-full border-4 border-accent-primary/20 animate-spin-slow" style={{animationDirection: "reverse", animationDuration: "6s"}} />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <svg
-              className="h-20 w-20 text-accent-primary/40 animate-pulse-glow"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1}
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"
-              />
-            </svg>
-          </div>
-        </div>
 
-        <div className="text-center max-w-xs">
-          <p className="text-base font-semibold text-foreground mb-2 font-poppins">
-            📊 Coming Soon
-          </p>
-          <p className="text-sm text-foreground/60 font-inter mb-4">
-            Advanced visualization of your current spend vs. optimized recommendations
-          </p>
-          <div className="space-y-2 text-xs">
-            <p className="text-foreground/50 font-inter">
-              ✓ Recharts interactive charts
-            </p>
-            <p className="text-foreground/50 font-inter">
-              ✓ Bar charts showing comparison
-            </p>
-            <p className="text-foreground/50 font-inter">
-              ✓ Savings breakdown by tool
-            </p>
+      {/* Summary bar */}
+      <div className="mb-8 p-4 rounded-xl bg-surface/50 border border-border/40">
+        <div className="flex items-center justify-between text-sm mb-3">
+          <span className="text-foreground/60 font-inter">Total Monthly</span>
+          <div className="flex gap-6 text-xs font-semibold">
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm bg-danger/60 inline-block" />
+              Current: Rs {Math.round(currentSpend).toLocaleString("en-IN")}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm bg-success/60 inline-block" />
+              Optimized: Rs {Math.round(optimizedSpend).toLocaleString("en-IN")}
+            </span>
           </div>
         </div>
+        <div className="relative h-6 bg-surface rounded-full overflow-hidden border border-border/30">
+          <div
+            className="absolute inset-y-0 left-0 bg-gradient-to-r from-danger/40 to-danger/60 rounded-full transition-all duration-1000 ease-out"
+            style={{ width: "100%" }}
+          />
+          <div
+            className="absolute inset-y-0 left-0 bg-gradient-to-r from-success/50 to-success/70 rounded-full transition-all duration-1000 ease-out delay-300"
+            style={{
+              width:
+                currentSpend > 0
+                  ? `${Math.round((optimizedSpend / currentSpend) * 100)}%`
+                  : "100%",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Per-tool bars */}
+      <div className="space-y-5">
+        {toolBreakdowns.map((tool, idx) => {
+          const currentWidth = Math.max(
+            (tool.currentCost / maxCost) * 100,
+            2
+          );
+          const optimizedWidth = Math.max(
+            ((tool.currentCost - tool.savings) / maxCost) * 100,
+            2
+          );
+          const hasSavings = tool.savings > 0;
+
+          return (
+            <div
+              key={tool.toolName}
+              className="animate-fade-in"
+              style={{ animationDelay: `${idx * 0.1}s` }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold text-foreground font-poppins">
+                  {tool.toolName}
+                </span>
+                <span className="text-xs text-foreground/50 font-inter">
+                  Rs {Math.round(tool.currentCost).toLocaleString("en-IN")}/mo
+                  {hasSavings && (
+                    <span className="text-accent-primary ml-2 font-semibold">
+                      → Rs{" "}
+                      {Math.round(tool.currentCost - tool.savings).toLocaleString("en-IN")}
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              {/* Stacked bar */}
+              <div className="relative h-4 bg-surface/80 rounded-full overflow-hidden border border-border/20">
+                <div
+                  className="absolute inset-y-0 left-0 bg-danger/40 rounded-full transition-all duration-700 ease-out"
+                  style={{ width: `${currentWidth}%` }}
+                />
+                {hasSavings && (
+                  <div
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-accent-primary/50 to-accent-secondary/50 rounded-full transition-all duration-700 ease-out delay-200"
+                    style={{ width: `${optimizedWidth}%` }}
+                  />
+                )}
+                {!hasSavings && (
+                  <div
+                    className="absolute inset-y-0 left-0 bg-success/40 rounded-full transition-all duration-700 ease-out"
+                    style={{ width: `${currentWidth}%` }}
+                  />
+                )}
+              </div>
+
+              {hasSavings && (
+                <p className="text-xs text-accent-primary/80 mt-1 font-inter">
+                  Save Rs {Math.round(tool.savings).toLocaleString("en-IN")}/mo
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
