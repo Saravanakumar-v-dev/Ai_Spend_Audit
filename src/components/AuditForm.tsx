@@ -60,7 +60,8 @@ export default function AuditForm() {
     planName: string,
     quantity: number,
     estimatedMonthlyTokens?: { inputTokens: number; outputTokens: number },
-    billingCycle: "monthly" | "annual" = "monthly"
+    billingCycle: "monthly" | "annual" = "monthly",
+    activeUsers?: number
   ) => {
     setFormData((prev) => {
       // Avoid duplicates for MVP
@@ -69,7 +70,7 @@ export default function AuditForm() {
         ...prev,
         tools: [
           ...prev.tools,
-          { toolSlug, planName, quantity, billingCycle, estimatedMonthlyTokens },
+          { toolSlug, planName, quantity, billingCycle, estimatedMonthlyTokens, activeUsers },
         ],
       };
     });
@@ -321,16 +322,74 @@ export default function AuditForm() {
                   ))}
                 </div>
               ) : (
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-success font-semibold flex items-center gap-2 font-poppins">
-                    ✓ Added: {formData.tools.find(t => t.toolSlug === tool.slug)?.planName?.replace("_", " ")}
-                  </span>
-                  <button 
-                    onClick={() => removeTool(tool.slug)} 
-                    className="text-danger/80 hover:text-danger font-semibold transition-colors font-poppins"
-                  >
-                    Remove
-                  </button>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-success font-semibold flex items-center gap-2 font-poppins">
+                      ✓ Added: {formData.tools.find(t => t.toolSlug === tool.slug)?.planName?.replace("_", " ")}
+                    </span>
+                    <button 
+                      onClick={() => removeTool(tool.slug)} 
+                      className="text-danger/80 hover:text-danger font-semibold transition-colors font-poppins"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  
+                  {/* Billing Cycle Toggle — for subscription tools */}
+                  {!tool.slug.startsWith("api_") && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-foreground/50 font-inter">Billing:</span>
+                      <div className="flex rounded-lg border border-border/40 overflow-hidden">
+                        {(["monthly", "annual"] as const).map((cycle) => (
+                          <button
+                            key={cycle}
+                            onClick={() => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                tools: prev.tools.map((t) =>
+                                  t.toolSlug === tool.slug ? { ...t, billingCycle: cycle } : t
+                                ),
+                              }));
+                            }}
+                            className={`px-3 py-1.5 text-xs font-medium transition-all ${
+                              (formData.tools.find(t => t.toolSlug === tool.slug)?.billingCycle || "monthly") === cycle
+                                ? "bg-accent-primary/20 text-accent-primary"
+                                : "text-foreground/40 hover:text-foreground/60"
+                            }`}
+                          >
+                            {cycle === "monthly" ? "Monthly" : "Annual"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Active Users Input — for per-seat plans */}
+                  {tool.options.find(o => o.slug === formData.tools.find(t => t.toolSlug === tool.slug)?.planName)?.quantity !== 1 && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-foreground/50 font-inter whitespace-nowrap">Active users:</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={formData.teamSize || 9999}
+                        placeholder={`${formData.teamSize || "All"}`}
+                        value={formData.tools.find(t => t.toolSlug === tool.slug)?.activeUsers ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value === "" ? undefined : Number(e.target.value);
+                          setFormData((prev) => ({
+                            ...prev,
+                            tools: prev.tools.map((t) =>
+                              t.toolSlug === tool.slug ? { ...t, activeUsers: val } : t
+                            ),
+                          }));
+                        }}
+                        className="w-20 rounded-lg border border-border/40 bg-surface/50 px-3 py-1.5 text-xs text-foreground placeholder:text-foreground/30 focus:border-accent-primary focus:outline-none focus:ring-1 focus:ring-accent-primary/30 font-inter"
+                      />
+                      <span className="text-xs text-foreground/40 font-inter">
+                        of {formData.teamSize || "?"} total
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -163,14 +163,21 @@ describe("Audit Engine calculateAudit", () => {
 
     expect(result.totalCurrentMonthlySpend).toBeGreaterThan(result.totalOptimizedMonthlySpend);
     expect(result.totalMonthlySavings).toBeGreaterThan(0);
-    // Should downgrade cursor from teams to pro
-    expect(result.toolResults.find(t => t.toolSlug === "cursor")?.recommendedPlan).toBe("pro");
-    // Claude is the SECOND chatbot in detectOverlaps order ["chatgpt","claude"] — cancelled for consolidation
+    
+    // Smart overlap: Copilot Enterprise (Rs 3,680) is CHEAPER than Cursor Teams (Rs 3,775)
+    // So Copilot is kept, Cursor is cancelled
+    expect(result.toolResults.find(t => t.toolSlug === "cursor")?.recommendedPlan).toBe("Cancel / Consolidate");
+    // Copilot is kept (cheaper IDE) — gets downgraded by small-team rule to business
+    const copilotResult = result.toolResults.find(t => t.toolSlug === "copilot");
+    expect(copilotResult?.monthlySavings).toBeGreaterThan(0);
+
+    // Smart overlap: Claude Team Premium (Rs 14,156) is CHEAPER than ChatGPT Pro (Rs 18,874)
+    // So Claude is kept (downgraded to Pro by small-team rule), ChatGPT is cancelled
     const claudeResult = result.toolResults.find(t => t.toolSlug === "claude");
-    expect(claudeResult?.recommendedPlan).toBe("Cancel / Consolidate");
+    expect(claudeResult?.recommendedPlan).not.toBe("Cancel / Consolidate");
     expect(claudeResult?.monthlySavings).toBeGreaterThan(0);
-    // ChatGPT is the FIRST chatbot — kept, downgraded from Pro to Plus
-    expect(result.toolResults.find(t => t.toolSlug === "chatgpt")?.recommendedPlan).toBe("plus");
+    // ChatGPT is cancelled (more expensive chatbot)
+    expect(result.toolResults.find(t => t.toolSlug === "chatgpt")?.recommendedPlan).toBe("Cancel / Consolidate");
   });
 
   it("handles a user who is already perfectly optimized", async () => {
@@ -190,5 +197,128 @@ describe("Audit Engine calculateAudit", () => {
     expect(result.totalMonthlySavings).toBe(0);
     expect(result.savingsPercentage).toBe(0);
     expect(result.toolResults[0].recommendedPlan).toBeUndefined();
+  });
+
+  // ── NEW FEATURE TESTS ─────────────────────────────────────────────
+
+  it("suggests annual billing when monthly is more expensive", async () => {
+    const input: AuditFormData = {
+      companyName: "AnnualTest",
+      teamSize: 5,
+      email: "test@annual.com",
+      tools: [
+        { toolSlug: "claude", planName: "team_standard", quantity: 5, billingCycle: "monthly" },
+      ],
+    };
+
+    const result = await calculateAudit(input);
+
+    // Claude Team Standard: monthly Rs 2,831.10/seat, annual Rs 2,359.25/seat
+    // Monthly cost: 2831.10 × 5 = Rs 14,155.50
+    // Annual cost:  2359.25 × 5 = Rs 11,796.25
+    expect(result.totalCurrentMonthlySpend).toBeCloseTo(14155.5, 0);
+    expect(result.totalOptimizedMonthlySpend).toBeCloseTo(11796.25, 0);
+    expect(result.totalMonthlySavings).toBeGreaterThan(0);
+    expect(result.toolResults[0].recommendedPlan).toContain("annual billing");
+  });
+
+  it("detects unused seats and suggests right-sizing", async () => {
+    const input: AuditFormData = {
+      companyName: "SeatWaste",
+      teamSize: 20,
+      email: "test@seatwaste.com",
+      tools: [
+        {
+          toolSlug: "copilot",
+          planName: "business",
+          quantity: 20,
+          billingCycle: "monthly",
+          activeUsers: 12,
+        },
+      ],
+    };
+
+    const result = await calculateAudit(input);
+
+    // Copilot Business: Rs 1,793.03/seat
+    // Current: 20 seats = Rs 35,860.60
+    // Right-sized: 12 seats = Rs 21,516.36
+    expect(result.totalCurrentMonthlySpend).toBeCloseTo(35860.6, 0);
+    expect(result.totalOptimizedMonthlySpend).toBeCloseTo(21516.36, 0);
+    expect(result.toolResults[0].recommendedPlan).toContain("12 seats");
+    expect(result.toolResults[0].reasoning).toContain("8 unused seats");
+  });
+
+  it("suggests cheaper API model for right-sizing", async () => {
+    const input: AuditFormData = {
+      companyName: "APIHeavy",
+      teamSize: 3,
+      email: "test@apiheavy.com",
+      tools: [
+        {
+          toolSlug: "api_anthropic_sonnet",
+          planName: "api_usage",
+          quantity: 1,
+          billingCycle: "monthly",
+          estimatedMonthlyTokens: {
+            inputTokens: 10_000_000,
+            outputTokens: 2_000_000,
+          },
+        },
+      ],
+    };
+
+    const result = await calculateAudit(input);
+
+    // Sonnet: (10M × 283.11 + 2M × 1415.55) / 1M = 2831.1 + 2831.1 = ~5662
+    // Haiku:  (10M × 75.5 + 2M × 377.48) / 1M   = 755 + 754.96 = ~1510
+    expect(result.totalMonthlySavings).toBeGreaterThan(3000); // ~Rs 4152 savings
+    expect(result.toolResults[0].recommendedPlan).toContain("Haiku");
+    expect(result.toolResults[0].reasoning).toContain("routine tasks");
+  });
+
+  it("adds cross-category note when IDE + standalone chatbot overlap", async () => {
+    const input: AuditFormData = {
+      companyName: "CrossCat",
+      teamSize: 1,
+      email: "test@crosscat.com",
+      tools: [
+        { toolSlug: "cursor", planName: "pro", quantity: 1, billingCycle: "monthly" },
+        { toolSlug: "claude", planName: "pro", quantity: 1, billingCycle: "monthly" },
+      ],
+    };
+
+    const result = await calculateAudit(input);
+
+    // Claude Pro should get a cross-category note because Cursor includes Claude Sonnet
+    const claudeResult = result.toolResults.find(t => t.toolSlug === "claude");
+    expect(claudeResult?.crossCategoryNote).toBeDefined();
+    expect(claudeResult?.crossCategoryNote).toContain("Cursor");
+    // Should also add a recommendation
+    expect(result.recommendations.some(r => r.includes("Cursor") && r.includes("Claude"))).toBe(true);
+  });
+
+  it("smart overlap keeps the cheaper tool", async () => {
+    const input: AuditFormData = {
+      companyName: "SmartOverlap",
+      teamSize: 5,
+      email: "test@smart.com",
+      tools: [
+        // Cursor Pro is flat Rs 1,887 (not per-seat)
+        { toolSlug: "cursor", planName: "pro", quantity: 1, billingCycle: "monthly" },
+        // Copilot Business is Rs 1,793/seat × 5 = Rs 8,965
+        { toolSlug: "copilot", planName: "business", quantity: 5, billingCycle: "monthly" },
+      ],
+    };
+
+    const result = await calculateAudit(input);
+
+    // Cursor Pro (Rs 1,887) is cheaper than Copilot Business (Rs 8,965)
+    // So Cursor should be KEPT and Copilot CANCELLED
+    const cursorResult = result.toolResults.find(t => t.toolSlug === "cursor");
+    const copilotResult = result.toolResults.find(t => t.toolSlug === "copilot");
+    
+    expect(cursorResult?.recommendedPlan).not.toBe("Cancel / Consolidate");
+    expect(copilotResult?.recommendedPlan).toBe("Cancel / Consolidate");
   });
 });

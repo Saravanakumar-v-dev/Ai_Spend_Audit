@@ -39,6 +39,12 @@ export const ToolSelectionSchema = z.object({
       outputTokens: z.number().min(0).optional(),
     })
     .optional(),
+  activeUsers: z
+    .number()
+    .int()
+    .min(0, "Active users cannot be negative")
+    .max(10000)
+    .optional(),
 });
 export type ToolSelection = z.infer<typeof ToolSelectionSchema>;
 
@@ -80,6 +86,7 @@ export const ToolAuditResultSchema = z.object({
   reasoning: z.string(),
   isOverlap: z.boolean().default(false),
   overlapWith: z.string().optional(),
+  crossCategoryNote: z.string().optional(),
 });
 export type ToolAuditResult = z.infer<typeof ToolAuditResultSchema>;
 

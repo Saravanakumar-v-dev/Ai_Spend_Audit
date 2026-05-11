@@ -83,6 +83,26 @@ const API_PRICING: Record<string, ApiModelPrice> = {
     inputPerMillionInr: 117.96,
     outputPerMillionInr: 943.7,
   },
+  // Cheaper models used for right-sizing suggestions
+  api_anthropic_haiku: {
+    inputPerMillionInr: 75.5,     // Claude Haiku 3.5 — ~$0.80/M input
+    outputPerMillionInr: 377.48,   // ~$4/M output
+  },
+  api_openai_4o_mini: {
+    inputPerMillionInr: 14.16,     // GPT-4o-mini — ~$0.15/M input
+    outputPerMillionInr: 56.62,    // ~$0.60/M output
+  },
+  api_gemini_flash: {
+    inputPerMillionInr: 7.08,      // Gemini 2.5 Flash — ~$0.075/M input
+    outputPerMillionInr: 28.31,    // ~$0.30/M output
+  },
+};
+
+// Map each premium API model to its cheaper alternative for right-sizing
+const API_CHEAPER_ALTERNATIVES: Record<string, { slug: string; name: string }> = {
+  api_anthropic_sonnet: { slug: "api_anthropic_haiku", name: "Claude Haiku 3.5 (for routine tasks)" },
+  api_openai_gpt5_4: { slug: "api_openai_4o_mini", name: "GPT-4o-mini (for routine tasks)" },
+  api_gemini_3_pro: { slug: "api_gemini_flash", name: "Gemini 2.5 Flash (for routine tasks)" },
 };
 
 function roundCurrency(value: number): number {
@@ -162,16 +182,8 @@ export async function calculateAudit(
         let outputTokens = tool.estimatedMonthlyTokens?.outputTokens;
         
         if (!inputTokens && !outputTokens) {
-          if (tool.toolSlug === "api_anthropic_sonnet") {
-            inputTokens = 10 * MILLION_TOKENS;
-            outputTokens = 2 * MILLION_TOKENS;
-          } else if (tool.toolSlug === "api_openai_gpt5_4") {
-            inputTokens = 10 * MILLION_TOKENS;
-            outputTokens = 2 * MILLION_TOKENS;
-          } else {
-            inputTokens = 10 * MILLION_TOKENS;
-            outputTokens = 2 * MILLION_TOKENS;
-          }
+          inputTokens = 10 * MILLION_TOKENS;
+          outputTokens = 2 * MILLION_TOKENS;
         }
 
         const inputCost =
@@ -185,6 +197,26 @@ export async function calculateAudit(
       }
 
       optimizedCost = currentCost;
+
+      // ── NEW RULE: API Right-Sizing ──────────────────────────────────
+      // Suggest a cheaper model if one exists in the same vendor family
+      const cheaperModel = API_CHEAPER_ALTERNATIVES[tool.toolSlug];
+      if (cheaperModel) {
+        const cheaperPricing = API_PRICING[cheaperModel.slug];
+        if (cheaperPricing) {
+          const inputTokens = tool.estimatedMonthlyTokens?.inputTokens || 10 * MILLION_TOKENS;
+          const outputTokens = tool.estimatedMonthlyTokens?.outputTokens || 2 * MILLION_TOKENS;
+          const cheaperInputCost = (inputTokens / MILLION_TOKENS) * cheaperPricing.inputPerMillionInr;
+          const cheaperOutputCost = (outputTokens / MILLION_TOKENS) * cheaperPricing.outputPerMillionInr;
+          const cheaperTotal = roundCurrency(cheaperInputCost + cheaperOutputCost);
+
+          if (cheaperTotal < optimizedCost) {
+            optimizedCost = cheaperTotal;
+            recommendedPlan = cheaperModel.name;
+            recommendationStr = `For routine tasks (summarization, classification, simple Q&A), ${cheaperModel.name} costs ${formatInr(cheaperTotal)}/mo vs ${formatInr(currentCost)}/mo — saving ${formatInr(currentCost - cheaperTotal)}/mo. Reserve ${getToolName(tool.toolSlug)} for complex reasoning tasks only.`;
+          }
+        }
+      }
     } else {
       currentCost = calculateSubscriptionCost(
         tool.toolSlug,
@@ -195,6 +227,47 @@ export async function calculateAudit(
       );
       optimizedCost = currentCost;
 
+      // ── NEW RULE: Annual Billing Suggestion ────────────────────────
+      // If the user pays monthly but the annual rate is cheaper, suggest switching
+      if (tool.billingCycle === "monthly") {
+        const plan = getSubscriptionPlan(tool.toolSlug, tool.planName);
+        if (plan && plan.annualMonthlyPriceInInr && plan.annualMonthlyPriceInInr < plan.priceInInr) {
+          const annualCost = plan.billing === "per_seat"
+            ? roundCurrency(plan.annualMonthlyPriceInInr * teamSize)
+            : roundCurrency(plan.annualMonthlyPriceInInr * tool.quantity);
+          
+          if (annualCost < optimizedCost) {
+            const monthlySaved = optimizedCost - annualCost;
+            optimizedCost = annualCost;
+            recommendedPlan = `${tool.planName} (annual billing)`;
+            recommendationStr = `Switch from monthly to annual billing to save ${formatInr(monthlySaved)}/mo (${formatInr(monthlySaved * 12)}/year). Same plan, same features — just a billing change.`;
+          }
+        }
+      }
+
+      // ── NEW RULE: Unused Seat Detection ─────────────────────────────
+      // If activeUsers is provided and less than teamSize, flag wasted seats
+      if (
+        tool.activeUsers !== undefined &&
+        tool.activeUsers < teamSize &&
+        ["per_seat"].includes(
+          getSubscriptionPlan(tool.toolSlug, tool.planName)?.billing || ""
+        )
+      ) {
+        const unusedSeats = teamSize - tool.activeUsers;
+        const plan = getSubscriptionPlan(tool.toolSlug, tool.planName)!;
+        const perSeatPrice = getEffectivePlanPrice(plan, tool.billingCycle);
+        const rightSizedCost = roundCurrency(perSeatPrice * tool.activeUsers);
+
+        if (rightSizedCost < optimizedCost) {
+          const wastedAmount = optimizedCost - rightSizedCost;
+          optimizedCost = rightSizedCost;
+          recommendedPlan = `${tool.planName} (${tool.activeUsers} seats)`;
+          recommendationStr = `You're paying for ${teamSize} seats but only ${tool.activeUsers} engineers actively use ${getToolName(tool.toolSlug)}. Removing ${unusedSeats} unused seat${unusedSeats > 1 ? "s" : ""} saves ${formatInr(wastedAmount)}/mo.`;
+        }
+      }
+
+      // ── EXISTING RULE: Small Team Overkill ──────────────────────────
       if (
         teamSize <= 2 &&
         ["teams", "business", "enterprise", "team_standard", "team_premium"].includes(
@@ -238,6 +311,7 @@ export async function calculateAudit(
         }
       }
 
+      // ── EXISTING RULE: Enterprise Negotiation ──────────────────────
       if (["enterprise", "team_premium"].includes(tool.planName)) {
         const negotiatedCost = roundCurrency(currentCost * 0.8);
 
@@ -249,6 +323,7 @@ export async function calculateAudit(
         }
       }
 
+      // ── EXISTING RULE: ChatGPT Pro Catch ───────────────────────────
       if (tool.toolSlug === "chatgpt" && tool.planName === "pro") {
         const alternativeCost = calculateSubscriptionCost(
           "chatgpt",
@@ -297,11 +372,11 @@ export async function calculateAudit(
     }
   }
 
-  const overlaps = detectOverlaps(toolSlugs);
+  const overlaps = detectOverlaps(toolSlugs, toolResults);
   for (const overlap of overlaps) {
     recommendations.push(overlap.recommendation);
     
-    // Keep the first tool, suggest cancelling the rest
+    // Keep the first tool (now the cheapest), suggest cancelling the rest
     const toolsToCancel = overlap.tools.slice(1);
     
     overlap.tools.forEach((slug) => {
@@ -326,6 +401,9 @@ export async function calculateAudit(
       }
     });
   }
+
+  // ── NEW: Cross-category recommendations ───────────────────────────
+  detectCrossCategory(toolResults, recommendations);
 
   totalCurrentMonthlySpend = roundCurrency(totalCurrentMonthlySpend);
   totalOptimizedMonthlySpend = roundCurrency(totalOptimizedMonthlySpend);
@@ -353,8 +431,49 @@ export async function calculateAudit(
   };
 }
 
+// ── NEW: Cross-category alternatives mapping ────────────────────────
+// IDE tools that include built-in AI chat, making standalone chatbot
+// subscriptions potentially redundant.
+const IDE_WITH_BUILTIN_CHAT: Record<string, string> = {
+  cursor: "Cursor includes Claude Sonnet via Auto mode",
+  copilot: "Copilot includes GPT-5 via chat panel",
+};
+
+function detectCrossCategory(
+  toolResults: ToolAuditResult[],
+  recommendations: string[]
+): void {
+  const ideSlugs = toolResults
+    .filter((t) => ["cursor", "copilot", "windsurf"].includes(t.toolSlug))
+    .map((t) => t.toolSlug);
+  const chatbotSlugs = toolResults
+    .filter((t) => ["claude", "chatgpt"].includes(t.toolSlug))
+    .map((t) => t.toolSlug);
+
+  for (const ide of ideSlugs) {
+    const builtIn = IDE_WITH_BUILTIN_CHAT[ide];
+    if (!builtIn) continue;
+
+    for (const chatbot of chatbotSlugs) {
+      const chatResult = toolResults.find((t) => t.toolSlug === chatbot);
+      if (!chatResult || chatResult.recommendedPlan === "Cancel / Consolidate") continue;
+
+      // Only flag individual chatbot plans (Pro/Plus), not Team/Business plans
+      // which provide additional workspace features
+      const individualPlans = ["pro", "plus"];
+      if (individualPlans.includes(chatResult.currentPlan)) {
+        chatResult.crossCategoryNote = `💡 ${builtIn} — you may not need a separate ${chatResult.toolName} subscription if you primarily use it for coding assistance.`;
+        recommendations.push(
+          `Consider whether your ${getToolName(ide)} subscription already covers your ${chatResult.toolName} use case. ${builtIn}.`
+        );
+      }
+    }
+  }
+}
+
 export function detectOverlaps(
-  toolSlugs: string[]
+  toolSlugs: string[],
+  toolResults?: ToolAuditResult[]
 ): Array<{ tools: string[]; category: string; recommendation: string }> {
   const overlaps = [];
 
@@ -362,12 +481,21 @@ export function detectOverlaps(
     toolSlugs.includes(toolSlug)
   );
   if (ides.length > 1) {
+    // ── IMPROVED: Smart overlap — keep the cheaper tool ──────────
+    let sortedIdes = ides;
+    if (toolResults) {
+      sortedIdes = [...ides].sort((a, b) => {
+        const costA = toolResults.find((t) => t.toolSlug === a)?.currentMonthlyCost ?? 0;
+        const costB = toolResults.find((t) => t.toolSlug === b)?.currentMonthlyCost ?? 0;
+        return costA - costB; // cheapest first (will be kept)
+      });
+    }
     overlaps.push({
-      tools: ides,
+      tools: sortedIdes,
       category: "ide",
-      recommendation: `You are paying for multiple IDE assistants (${ides.join(
+      recommendation: `You are paying for multiple IDE assistants (${sortedIdes.join(
         " and "
-      )}). Standardizing on one can eliminate redundant spending.`,
+      )}). Standardizing on ${getToolName(sortedIdes[0])} (cheapest) can eliminate redundant spending.`,
     });
   }
 
@@ -375,12 +503,20 @@ export function detectOverlaps(
     toolSlugs.includes(toolSlug)
   );
   if (chatbots.length > 1) {
+    let sortedChatbots = chatbots;
+    if (toolResults) {
+      sortedChatbots = [...chatbots].sort((a, b) => {
+        const costA = toolResults.find((t) => t.toolSlug === a)?.currentMonthlyCost ?? 0;
+        const costB = toolResults.find((t) => t.toolSlug === b)?.currentMonthlyCost ?? 0;
+        return costA - costB;
+      });
+    }
     overlaps.push({
-      tools: chatbots,
+      tools: sortedChatbots,
       category: "chatbot",
-      recommendation: `You are paying for multiple premium chatbots (${chatbots.join(
+      recommendation: `You are paying for multiple premium chatbots (${sortedChatbots.join(
         " and "
-      )}). Most teams only need one frontier model interface.`,
+      )}). Most teams only need one frontier model interface. Keeping ${getToolName(sortedChatbots[0])} (cheapest).`,
     });
   }
 

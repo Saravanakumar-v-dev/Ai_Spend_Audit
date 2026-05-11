@@ -204,6 +204,11 @@ export default async function AuditReportPage({ params }: AuditPageProps) {
                       * Estimated based on moderate API usage (~10M input, ~2M output tokens/mo)
                     </p>
                   )}
+                  {tool.crossCategoryNote && (
+                    <p className="text-xs text-warning mt-3 p-2 rounded-lg bg-warning/5 border border-warning/20 font-inter">
+                      {tool.crossCategoryNote}
+                    </p>
+                  )}
                 </div>
 
                 <div className="text-right min-w-[130px]">
