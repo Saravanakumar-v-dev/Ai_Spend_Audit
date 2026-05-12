@@ -9,10 +9,11 @@
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabasePublishableKey =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+import {
+  getSupabasePublicKey,
+  getSupabasePublicUrl,
+} from "./supabase-env";
+
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 let _supabase: SupabaseClient | null = null;
@@ -27,8 +28,13 @@ let _supabaseAdmin: SupabaseClient | null = null;
 export function getSupabase(): SupabaseClient {
   if (_supabase) return _supabase;
 
+  const supabaseUrl = getSupabasePublicUrl();
+  const supabasePublishableKey = getSupabasePublicKey();
+
   if (!supabaseUrl) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL environment variable");
+    throw new Error(
+      "Missing or invalid NEXT_PUBLIC_SUPABASE_URL environment variable"
+    );
   }
 
   if (!supabasePublishableKey) {
@@ -50,6 +56,8 @@ export function getSupabase(): SupabaseClient {
  */
 export function getSupabaseAdmin(): SupabaseClient | null {
   if (_supabaseAdmin) return _supabaseAdmin;
+
+  const supabaseUrl = getSupabasePublicUrl();
 
   if (!supabaseUrl || !supabaseServiceKey) {
     console.log("[supabase] Service role key not configured — admin client unavailable.");
