@@ -1,6 +1,6 @@
 # AI Spend Audit — by Saravanakumar
 
-A free, deterministic audit tool for startups that reveals exactly how much your engineering team overspends on AI subscriptions (Cursor, Copilot, ChatGPT, Claude, and API platforms). It generates a shareable, privacy-safe report with line-item savings — no LLM guesswork on the numbers, no credit card required. Built as a lead-generation engine for Credex AI consulting.
+A free, deterministic audit tool for startups that reveals exactly how much your engineering team overspends on AI subscriptions (Cursor, Copilot, ChatGPT, Claude, and API platforms). It generates a shareable, privacy-safe report with line-item savings — no LLM guesswork on the numbers, no credit card required. Built as a lead-generation engine for Saravanakumar AI consulting.
 
 **Target Audience:** Seed-to-Series-A VPs of Engineering, CTOs, and technical founders at AI-native startups with 5–50 engineers who are paying for overlapping AI tools without a procurement strategy.
 
@@ -95,7 +95,7 @@ When a user has both Cursor and Copilot, the engine now keeps the **cheaper** to
 | Rule | Trigger | Example |
 |:-----|:--------|:--------|
 | Small Team Overkill | teamSize ≤ 2 on Teams/Enterprise plan | Cursor Teams → Pro (50% savings) |
-| Enterprise Negotiation | Enterprise or Team Premium tier | 20% Credex volume discount |
+| Enterprise Negotiation | Enterprise or Team Premium tier | 20% Saravanakumar volume discount |
 | ChatGPT Pro Catch | Pro plan ($200/mo) | Downgrade to Plus ($20/mo, 90% savings) |
 | Annual Billing | Monthly billing, annual is cheaper | Claude Team: save Rs 2,359/mo on 5 seats |
 | Unused Seats | activeUsers < teamSize | 8 unused Copilot seats = Rs 14,344/mo wasted |

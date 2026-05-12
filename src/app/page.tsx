@@ -1,5 +1,5 @@
 /**
- * Landing Page — AI Spend Audit by Saravanakumar
+ * Landing Page — Saravanakumar AI Spend Audit
  *
  * Statically generated (SSG) for instant load and SEO indexing.
  * Contains the marketing hero, value propositions, and the audit form.
@@ -14,9 +14,9 @@ export default function HomePage() {
       {/* Navigation */}
       <nav className="border-b border-border/50 px-6 py-4 sticky top-0 z-50 backdrop-blur-md bg-background/80" aria-label="Main navigation">
         <div className="mx-auto max-w-5xl flex items-center justify-between">
-          <span className="text-xl font-bold gradient-text-fast font-display">
-            Saravanakumar
-          </span>
+          <a href="https://saravanakumar-v-portfolio.vercel.app/" target="_blank" rel="noopener noreferrer" className="text-xl font-bold gradient-text-fast font-display hover:opacity-80 transition-opacity">
+            Saravanakumar Spend Lab
+          </a>
           <a
             href="#audit-form"
             className="group relative rounded-full bg-accent-primary/10 px-5 py-2.5 text-sm font-semibold text-accent-primary transition-all duration-300 hover:bg-accent-primary hover:text-white hover:shadow-[0_0_20px_var(--accent-glow)] hover:-translate-y-0.5 border border-accent-primary/20 hover:border-accent-primary/50"
@@ -54,9 +54,9 @@ export default function HomePage() {
           </h1>
 
           <p className="mt-6 text-lg sm:text-xl text-foreground/70 max-w-xl mx-auto leading-relaxed font-inter animate-slide-up" style={{animationDelay: "0.2s"}}>
-            Cursor, Copilot, ChatGPT, Claude — the average startup spends{" "}
-            <span className="text-warning font-bold bg-warning/10 px-2 py-1 rounded-lg">Rs 2.2L/dev/year</span>{" "}
-            on AI subscriptions. <span className="text-danger">Most of it is wasted.</span>
+            Cursor, Copilot, ChatGPT, Claude, Gemini — the typical dev shop now layers{" "}
+            <span className="text-warning font-bold bg-warning/10 px-2 py-1 rounded-lg">$600–1,500 / seat / year</span>{" "}
+            in AI subscriptions. <span className="text-danger">Most can be right-sized.</span>
           </p>
 
           <p className="mt-4 text-sm text-foreground/50 font-inter animate-slide-up" style={{animationDelay: "0.3s"}}>
@@ -111,7 +111,7 @@ export default function HomePage() {
               {
                 icon: "💻",
                 title: "IDE Assistants",
-                tools: "Cursor · Copilot · Windsurf",
+                tools: "Cursor · Copilot · v0",
                 color: "from-accent-primary/20 to-accent-secondary/10",
               },
               {
@@ -175,7 +175,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="border-t border-border/50 px-6 py-10 bg-surface/20 backdrop-blur-sm">
         <div className="mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-foreground/50 font-inter">
-          <span>© 2026 Saravanakumar. All rights reserved.</span>
+          <span>© 2026 Saravanakumar Spend Lab.</span>
           <div className="flex gap-8">
             <span className="text-foreground/30 cursor-default" title="Privacy policy coming soon">
               Privacy
@@ -184,12 +184,12 @@ export default function HomePage() {
               Terms
             </span>
             <a
-              href="https://saravanakumar.com"
+              href="https://saravanakumar-v-portfolio.vercel.app/"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-accent-primary transition-colors duration-300 flex items-center gap-1"
             >
-              Saravanakumar
+              Contact Saravanakumar
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6 7.5-7.5m0 0-7.5 7.5" />
               </svg>

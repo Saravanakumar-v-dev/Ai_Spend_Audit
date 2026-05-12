@@ -1,21 +1,21 @@
 /**
  * Audit Report Page - /audit/[id]
- *
- * Server-rendered page for the personalized audit report.
- * Includes visual savings chart, line-item breakdown with current costs,
- * and copy/share functionality.
  */
 
 import type { Metadata } from "next";
 import Link from "next/link";
 
-// For MVP, we use a mocked data fallback so the UI works 
-// even if the database is not fully connected with Service Keys.
 import { calculateAudit } from "@/lib/audit-engine";
 import { generateAISummary } from "@/lib/ai-summary";
-import { AuditFormData } from "@/lib/validators";
+import type { AuditFormData } from "@/lib/validators";
 import SavingsChart from "@/components/SavingsChart";
 import CopyLinkButton from "@/components/CopyLinkButton";
+import OptimizationNotifySignup from "@/components/OptimizationNotifySignup";
+import { formatUsd } from "@/lib/format-usd";
+import {
+  MONTHLY_SAVINGS_SARAVANAKUMAR_HIGHLIGHT_USD,
+  MONTHLY_SAVINGS_HONEST_SMALL_USD,
+} from "@/lib/savings-thresholds";
 
 interface AuditPageProps {
   params: Promise<{ id: string }>;
@@ -26,8 +26,8 @@ export async function generateMetadata({
 }: AuditPageProps): Promise<Metadata> {
   const { id } = await params;
   return {
-    title: `AI Spend Audit Report - ${id.slice(0, 8)}`,
-    description: "Personalized AI spend audit report.",
+    title: `AI Spend Audit — ${id.slice(0, 8)}`,
+    description: "USD-native AI procurement audit tuned for Saravanakumar benchmarks.",
   };
 }
 
@@ -36,45 +36,55 @@ export const revalidate = 3600;
 export default async function AuditReportPage({ params }: AuditPageProps) {
   const { id } = await params;
 
-  // We use our stateless URL encoding strategy to parse the data from the URL
   let parsedInput: AuditFormData | null = null;
   try {
-    // Attempt to decode the id parameter. 
-    // This will throw if the ID is an old stub (e.g., 'stub-id-123') or invalid base64.
-    const decoded = Buffer.from(decodeURIComponent(id), 'base64url').toString('utf-8');
+    const decoded = Buffer.from(
+      decodeURIComponent(id),
+      "base64url"
+    ).toString("utf-8");
     parsedInput = JSON.parse(decoded) as AuditFormData;
-  } catch (error) {
-    // Silently catch to avoid Next.js dev overlay intercepting console.error
+  } catch {
     console.log("Invalid URL payload. Falling back to mock data.");
   }
 
-  // Fallback to mock data if someone hits a bad URL directly
-  const inputData = parsedInput || {
+  const inputData: AuditFormData = parsedInput ?? {
     companyName: "Acme Corp",
-    teamSize: 5,
+    teamSize: 6,
     email: "founder@acmecorp.com",
+    primaryUseCase: "coding",
     tools: [
-      { toolSlug: "copilot", planName: "enterprise", quantity: 5, billingCycle: "monthly" },
-      { toolSlug: "claude", planName: "team_premium", quantity: 5, billingCycle: "monthly" }
-    ]
+      {
+        toolSlug: "copilot",
+        planName: "enterprise",
+        quantity: 6,
+        seatCount: 6,
+        billingCycle: "monthly",
+      },
+      {
+        toolSlug: "claude",
+        planName: "team",
+        quantity: 6,
+        seatCount: 6,
+        billingCycle: "monthly",
+      },
+    ],
   };
-  
-  const result = await calculateAudit(inputData);
+
+  const result = await calculateAudit({
+    ...inputData,
+    teamSize: inputData.teamSize ?? 1,
+  });
   const aiSummary = await generateAISummary(result);
 
   const totalMonthlySavings = result.totalMonthlySavings;
   const totalAnnualSavings = result.totalAnnualSavings;
-  
-  // Thresholds based on INR (~$100 and ~$500)
-  const HONESTY_THRESHOLD_INR = 8350;
-  const HIGH_SAVINGS_THRESHOLD_INR = 41750;
 
-  const isPerfectlyOptimized = totalMonthlySavings < HONESTY_THRESHOLD_INR;
-  const isHighSavings = totalMonthlySavings > HIGH_SAVINGS_THRESHOLD_INR;
+  const isAlreadyOptimal =
+    totalMonthlySavings < MONTHLY_SAVINGS_HONEST_SMALL_USD;
+  const shouldHighlightSaravanakumar =
+    totalMonthlySavings > MONTHLY_SAVINGS_SARAVANAKUMAR_HIGHLIGHT_USD;
 
-  // Prepare chart data
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-  const shareUrl = `${baseUrl}/share/${id}`;
+  const shareUrl = `/share/${id}`;
 
   const toolBreakdowns = result.toolResults.map((t) => ({
     toolName: t.toolName,
@@ -88,92 +98,142 @@ export default async function AuditReportPage({ params }: AuditPageProps) {
       <header className="border-b border-border bg-surface/80 backdrop-blur-md px-6 py-4 sticky top-0 z-50">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <Link href="/" className="text-xl font-bold gradient-text">
-            Saravanakumar AI Audit
+            Saravanakumar · AI Spend Lab
           </Link>
           <div className="flex items-center gap-3">
-            <CopyLinkButton url={shareUrl} label="Copy Link" />
+            <CopyLinkButton url={shareUrl} label="Copy share link" />
+            <a
+              href={`/api/pdf/${id}`}
+              className="rounded-full bg-surface-elevated px-4 py-2 text-sm font-medium text-foreground/70 transition-all duration-300 hover:bg-accent-primary/20 hover:text-accent-primary border border-border"
+            >
+              Export PDF
+            </a>
             <Link
               href={`/share/${id}`}
               className="rounded-full bg-surface-elevated px-4 py-2 text-sm font-medium text-foreground/70 transition-all duration-300 hover:bg-accent-primary/20 hover:text-accent-primary border border-border"
             >
-              Share Report ↗
+              Open public view ↗
             </Link>
           </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-5xl px-6 py-12 space-y-12 animate-slide-up">
-        
-        {/* HERO SECTION */}
-        <section className="text-center space-y-6">
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
-            Your AI Spend Analysis
-          </h1>
-          <p className="text-lg text-foreground/60 max-w-2xl mx-auto leading-relaxed">
-            {aiSummary}
-          </p>
+        <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-surface via-background to-surface-elevated shadow-[0_40px_120px_rgba(15,23,42,0.45)]">
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute -top-32 right-0 h-72 w-72 rounded-full bg-accent-primary/25 blur-[120px]" />
+            <div className="absolute bottom-0 left-0 h-64 w-64 rounded-full bg-accent-secondary/20 blur-[100px]" />
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8">
-            <div className="glass rounded-2xl p-8 border border-border">
-              <p className="text-sm font-medium text-foreground/50 uppercase tracking-wider mb-2">Current Monthly</p>
-              <p className="text-4xl font-bold text-danger">
-                Rs {Math.round(result.totalCurrentMonthlySpend).toLocaleString('en-IN')}
+          <div className="relative px-6 py-12 sm:px-12 sm:py-16 space-y-10">
+            <div className="text-center space-y-4 max-w-3xl mx-auto">
+              <p className="text-xs font-semibold tracking-[0.35em] uppercase text-accent-primary/80">
+                USD benchmark · {result.pricingReferenceDate}
+              </p>
+              <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-tight">
+                {isAlreadyOptimal ? (
+                  <>You&apos;re already running a lean stack.</>
+                ) : (
+                  <>
+                    Unlock{" "}
+                    <span className="gradient-text">
+                      {formatUsd(totalMonthlySavings)}
+                    </span>{" "}
+                    / month
+                  </>
+                )}
+              </h1>
+              <p className="text-lg text-foreground/70 leading-relaxed">
+                {aiSummary}
               </p>
             </div>
-            <div className="glass rounded-2xl p-8 border border-border ring-2 ring-accent-primary/20">
-              <p className="text-sm font-medium text-accent-primary uppercase tracking-wider mb-2">Monthly Savings</p>
-              <p className="text-4xl font-bold text-accent-primary">
-                Rs {Math.round(totalMonthlySavings).toLocaleString('en-IN')}
-              </p>
-            </div>
-            <div className="glass rounded-2xl p-8 border border-border">
-              <p className="text-sm font-medium text-success uppercase tracking-wider mb-2">Annual Savings</p>
-              <p className="text-4xl font-bold text-success">
-                Rs {Math.round(totalAnnualSavings).toLocaleString('en-IN')}
-              </p>
+
+            <div className="grid gap-5 md:grid-cols-3">
+              <div className="rounded-2xl border border-white/5 bg-white/5 p-6 backdrop-blur-xl">
+                <p className="text-xs uppercase tracking-wide text-foreground/50 mb-2">
+                  Current monthly (USD)
+                </p>
+                <p className="text-4xl font-black text-danger">
+                  {formatUsd(result.totalCurrentMonthlySpend)}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-accent-primary/40 bg-accent-primary/10 p-6 backdrop-blur-xl shadow-[0_20px_80px_rgba(99,102,241,0.35)]">
+                <p className="text-xs uppercase tracking-wide text-accent-primary mb-2">
+                  Monthly savings
+                </p>
+                <p className="text-5xl font-black text-white">
+                  {formatUsd(totalMonthlySavings)}
+                </p>
+                <p className="text-sm text-white/80 mt-2">
+                  ≈ {formatUsd(totalAnnualSavings)} annualized runway
+                </p>
+              </div>
+              <div className="rounded-2xl border border-white/5 bg-white/5 p-6 backdrop-blur-xl">
+                <p className="text-xs uppercase tracking-wide text-foreground/50 mb-2">
+                  Optimized monthly
+                </p>
+                <p className="text-4xl font-black text-success">
+                  {formatUsd(result.totalOptimizedMonthlySpend)}
+                </p>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* HONESTY FILTER OR HIGH SAVINGS CTA */}
-        {isPerfectlyOptimized ? (
-          <section className="glass rounded-2xl p-10 border border-success/30 bg-success/5 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/20 text-success mb-6">
-              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-bold mb-4">You're spending well.</h2>
-            <p className="text-foreground/70 max-w-xl mx-auto mb-8">
-              We don't manufacture fake savings. Your current AI stack is highly optimized for your team size. There are no major changes we recommend right now.
-            </p>
-            <div className="max-w-md mx-auto">
-              <form className="flex gap-2">
-                <input 
-                  type="email" 
-                  placeholder="Notify me when new optimizations apply" 
-                  className="flex-1 rounded-lg border border-border bg-background px-4 py-3 focus:ring-2 focus:ring-accent-primary outline-none"
-                  required
-                />
-                <button type="submit" className="bg-surface-elevated hover:bg-border px-6 py-3 rounded-lg font-medium transition-colors">
-                  Notify Me
-                </button>
-              </form>
+        {shouldHighlightSaravanakumar && (
+          <section className="relative overflow-hidden rounded-3xl border border-accent-secondary/40 bg-gradient-to-br from-accent-primary/25 via-accent-secondary/10 to-accent-tertiary/20 px-8 py-10 text-center shadow-glow space-y-5">
+            <div className="absolute inset-y-10 right-0 w-1/3 bg-white/15 blur-[90px]" />
+            <div className="relative space-y-3">
+              <p className="text-xs font-semibold tracking-[0.4em] uppercase text-white/70">
+                Enterprise leverage window
+              </p>
+              <h2 className="text-3xl md:text-4xl font-black text-white leading-tight">
+                Capture more than slide math with Saravanakumar
+              </h2>
+              <p className="text-white/85 text-lg leading-relaxed max-w-3xl mx-auto">
+                When modeled savings crest{" "}
+                <span className="font-bold">
+                  {formatUsd(MONTHLY_SAVINGS_SARAVANAKUMAR_HIGHLIGHT_USD)}
+                </span>
+                , procurement execution matters as much as the benchmark.
+                Saravanakumar stages renewals, contract floors, and usage guardrails so
+                the dollars actually hit your runway — not slides.
+              </p>
+              <div className="flex flex-wrap justify-center gap-4 pt-4">
+                <a
+                  href="https://saravanakumar-v-portfolio.vercel.app/"
+                  className="inline-flex items-center justify-center rounded-full bg-white px-8 py-3 text-base font-semibold text-slate-900 shadow-lg shadow-black/30 transition hover:-translate-y-0.5"
+                >
+                  Contact Saravanakumar
+                </a>
+                <Link
+                  href="/"
+                  className="inline-flex items-center justify-center rounded-full border border-white/40 px-8 py-3 text-base font-semibold text-white hover:bg-white/10"
+                >
+                  Run another stack
+                </Link>
+              </div>
             </div>
           </section>
-        ) : isHighSavings ? (
-          <section className="glass rounded-2xl p-10 border border-accent-primary/30 bg-accent-primary/5 text-center">
-            <h2 className="text-3xl font-bold mb-4 text-accent-primary">Massive Savings Detected</h2>
-            <p className="text-lg text-foreground/80 max-w-2xl mx-auto mb-8">
-              Your team is overspending by more than Rs 40,000 every month. Saravanakumar can help you restructure your licenses and negotiate enterprise volume discounts.
-            </p>
-            <button className="bg-accent-primary hover:bg-accent-primary-hover text-white font-bold py-4 px-10 rounded-full shadow-lg shadow-accent-glow transition-all hover:-translate-y-1 text-lg animate-pulse-glow">
-              Book a Credex Consultation
-            </button>
-          </section>
-        ) : null}
+        )}
 
-        {/* SAVINGS CHART */}
+        {isAlreadyOptimal && (
+          <OptimizationNotifySignup
+            defaultEmail={parsedInput?.email ?? inputData.email}
+          />
+        )}
+
+        {!isAlreadyOptimal && !shouldHighlightSaravanakumar && (
+          <section className="rounded-3xl border border-border/70 bg-surface/70 p-10 text-center space-y-5">
+            <h3 className="text-2xl font-bold">Meaningful, not theatrical</h3>
+            <p className="text-foreground/70 max-w-2xl mx-auto">
+              Savings sit between pragmatic double digits and Saravanakumar-worthy
+              triple digits in USD — still worth enforcing, especially before
+              your next renewal window.
+            </p>
+          </section>
+        )}
+
         {result.toolResults.length > 0 && (
           <SavingsChart
             currentSpend={result.totalCurrentMonthlySpend}
@@ -183,54 +243,112 @@ export default async function AuditReportPage({ params }: AuditPageProps) {
           />
         )}
 
-        {/* DETAILED BREAKDOWN */}
         <section className="space-y-6">
-          <h3 className="text-2xl font-bold">Line-Item Analysis</h3>
-          <div className="space-y-4">
-            {result.toolResults.map((tool, idx) => (
-              <div key={idx} className="glass p-6 rounded-xl border border-border flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
-                <div className="min-w-[160px]">
-                  <h4 className="font-bold text-lg">{tool.toolName}</h4>
-                  <p className="text-sm text-foreground/50">Plan: {tool.currentPlan}</p>
-                  <p className="text-sm text-foreground/60 font-semibold mt-1">
-                    Rs {Math.round(tool.currentMonthlyCost).toLocaleString('en-IN')}/mo
-                  </p>
-                </div>
-                
-                <div className="flex-1 max-w-xl text-sm bg-background/50 p-4 rounded-lg border border-border/50">
-                  <p className="font-medium text-foreground/80">{tool.reasoning}</p>
-                  {tool.toolSlug.startsWith("api_") && !tool.reasoning.includes("token") && (
-                    <p className="text-xs text-foreground/40 mt-2 italic">
-                      * Estimated based on moderate API usage (~10M input, ~2M output tokens/mo)
-                    </p>
-                  )}
-                  {tool.crossCategoryNote && (
-                    <p className="text-xs text-warning mt-3 p-2 rounded-lg bg-warning/5 border border-warning/20 font-inter">
-                      {tool.crossCategoryNote}
-                    </p>
-                  )}
-                </div>
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-foreground/50">
+                Per-tool playbook
+              </p>
+              <h3 className="text-3xl font-black">Spend → Action → Savings</h3>
+            </div>
+            <p className="text-sm text-foreground/60 max-w-lg">
+              Every row pairs your modeled USD invoice with one decisive move.
+              Reasons stay one sentence — perfect for Slack forwards.
+            </p>
+          </div>
 
-                <div className="text-right min-w-[130px]">
-                  <p className="text-sm text-foreground/50">Potential Savings</p>
-                  <p className={`font-bold text-lg ${tool.monthlySavings > 0 ? 'text-accent-primary' : 'text-foreground/30'}`}>
-                    {tool.monthlySavings > 0 ? `+ Rs ${Math.round(tool.monthlySavings).toLocaleString('en-IN')}/mo` : 'Optimized'}
-                  </p>
+          <div className="space-y-5">
+            {result.toolResults.map((tool, idx) => (
+              <div
+                key={`${tool.toolSlug}-${idx}`}
+                className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-surface via-background to-surface p-6 sm:p-8 shadow-xl"
+              >
+                <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="space-y-2 min-w-[220px]">
+                    <p className="text-xs font-semibold text-accent-secondary uppercase tracking-wide">
+                      {tool.toolName}
+                    </p>
+                    <h4 className="text-2xl font-black">{tool.currentPlan}</h4>
+                    <p className="text-sm text-foreground/60">
+                      Current modeled spend
+                    </p>
+                    <p className="text-3xl font-black text-danger">
+                      {formatUsd(tool.currentMonthlyCost)}{" "}
+                      <span className="text-base font-semibold text-foreground/60">
+                        / mo
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="flex-1 space-y-5">
+                    <div className="flex flex-wrap items-center gap-3 text-sm md:text-base">
+                      {tool.monthlySavings > 0 ? (
+                        <>
+                          <span className="rounded-full bg-white/10 px-4 py-1 font-semibold text-white">
+                            Action · {tool.recommendedAction}
+                          </span>
+                          <span className="text-xl text-accent-primary font-black">
+                            Save {formatUsd(tool.monthlySavings)} / mo
+                          </span>
+                        </>
+                      ) : (
+                        <span className="rounded-full border border-white/25 px-4 py-2 text-sm font-semibold text-white/85">
+                          {tool.recommendedAction} — deterministic list-price
+                          model shows no uplift to chase this cycle.
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-base text-foreground/80 leading-relaxed border border-border/60 rounded-xl p-4 bg-surface/40">
+                      {tool.reasoning}
+                    </p>
+                    {tool.crossCategoryNote && (
+                      <p className="text-xs text-warning border border-warning/30 rounded-lg px-4 py-3 bg-warning/5">
+                        {tool.crossCategoryNote}
+                      </p>
+                    )}
+                    {tool.toolSlug.startsWith("api_") && (
+                      <p className="text-[11px] text-foreground/45">
+                        * API rows default to moderate throughput (≈10M in · 2M
+                        out) unless your form overrides tokens.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="text-right min-w-[160px]">
+                    <p className="text-xs uppercase tracking-wide text-foreground/50">
+                      After optimization
+                    </p>
+                    <p className="text-4xl font-black text-success mt-2">
+                      {formatUsd(
+                        Math.max(
+                          tool.currentMonthlyCost - tool.monthlySavings,
+                          0
+                        )
+                      )}
+                    </p>
+                    <p className="text-[11px] text-foreground/50 mt-1">
+                      {tool.monthlySavings > 0
+                        ? `${Math.round(tool.savingsPercentage)}% of row spend`
+                        : "Already tuned"}
+                    </p>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         </section>
 
-        {/* Recommendations */}
         {result.recommendations.length > 0 && (
           <section className="glass rounded-2xl p-8 border border-accent-secondary/20 space-y-4">
             <h3 className="text-2xl font-bold flex items-center gap-2">
-              <span>💡</span> Recommendations
+              <span>💡</span> Recommendations queue
             </h3>
             <ul className="space-y-3">
               {result.recommendations.map((rec, idx) => (
-                <li key={idx} className="flex items-start gap-3 text-foreground/80 text-sm">
+                <li
+                  key={`${idx}-rec`}
+                  className="flex items-start gap-3 text-foreground/80 text-sm leading-relaxed"
+                >
                   <span className="text-accent-primary font-bold mt-0.5">→</span>
                   <span>{rec}</span>
                 </li>
@@ -239,9 +357,10 @@ export default async function AuditReportPage({ params }: AuditPageProps) {
           </section>
         )}
 
-        {/* Pricing disclaimer */}
-        <p className="text-center text-xs text-foreground/30 font-inter">
-          All prices verified as of {result.pricingReferenceDate}. Calculations are 100% deterministic — no AI guesswork on the numbers.
+        <p className="text-center text-xs text-foreground/40 font-inter">
+          Pricing snapshot {result.pricingReferenceDate}. All figures are modeled
+          in USD for apples-to-apples vendor comparisons — Saravanakumar overlays your
+          contract reality during implementation.
         </p>
       </div>
     </main>

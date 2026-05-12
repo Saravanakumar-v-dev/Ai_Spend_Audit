@@ -1,26 +1,23 @@
 /**
  * Privacy-Safe Share Page — /share/[id]
- *
- * Public-facing shareable audit report. This route explicitly strips
- * all PII (email, company_name) before rendering. Only the tool
- * breakdown and aggregate savings are shown.
- *
- * Uses the same stateless base64url encoding strategy as /audit/[id].
  */
 
 import type { Metadata } from "next";
 import Link from "next/link";
+
 import { calculateAudit } from "@/lib/audit-engine";
 import { generateAISummary } from "@/lib/ai-summary";
 import type { AuditFormData } from "@/lib/validators";
+import OptimizationNotifySignup from "@/components/OptimizationNotifySignup";
+import { formatUsd } from "@/lib/format-usd";
+import {
+  MONTHLY_SAVINGS_SARAVANAKUMAR_HIGHLIGHT_USD,
+  MONTHLY_SAVINGS_HONEST_SMALL_USD,
+} from "@/lib/savings-thresholds";
 
 interface SharePageProps {
   params: Promise<{ id: string }>;
 }
-
-// ---------------------------------------------------------------------------
-// Helper — decode the stateless URL payload
-// ---------------------------------------------------------------------------
 
 function decodePayload(id: string): AuditFormData | null {
   try {
@@ -34,10 +31,6 @@ function decodePayload(id: string): AuditFormData | null {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Dynamic Open Graph + Twitter Card metadata (Step 3)
-// ---------------------------------------------------------------------------
-
 export async function generateMetadata({
   params,
 }: SharePageProps): Promise<Metadata> {
@@ -45,250 +38,215 @@ export async function generateMetadata({
   const input = decodePayload(id);
 
   let savingsText = "Run your free AI spend audit";
+  let savingsAmount = "$0";
   if (input) {
     const result = await calculateAudit({
       ...input,
       teamSize: input.teamSize ?? 1,
     });
     if (result.totalMonthlySavings > 0) {
-      savingsText = `We found Rs ${Math.round(result.totalMonthlySavings).toLocaleString("en-IN")}/mo in wasted AI spend. Run your audit.`;
+      savingsAmount = formatUsd(result.totalMonthlySavings);
+      savingsText = `We found ${savingsAmount}/mo in AI spending savings`;
     }
   }
 
   const baseUrl =
     process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+  const shareUrl = `${baseUrl}/share/${id}`;
 
   return {
-    title: savingsText,
+    title: `${savingsText} — Saravanakumar Audit`,
     description:
-      "See the full breakdown of AI tool spending and savings opportunities. Free audit — no credit card required.",
+      "USD-native Saravanakumar benchmarking for AI tooling across Cursor, Copilot, ChatGPT, and Claude. Deterministic math, zero guesswork.",
+    alternates: {
+      canonical: shareUrl,
+    },
     openGraph: {
       title: savingsText,
       description:
-        "See the full breakdown of AI tool spending and savings opportunities.",
+        "Privacy-safe audit report showing AI spending optimization opportunities. Tools analyzed: Cursor, Copilot, ChatGPT, Claude, Gemini.",
       type: "website",
-      siteName: "Saravanakumar AI Spend Audit",
-      url: `${baseUrl}/share/${id}`,
+      siteName: "Saravanakumar Spend Lab",
+      url: shareUrl,
+      images: [
+        {
+          url: `${baseUrl}/og-image.png`,
+          width: 1200,
+          height: 630,
+          alt: "Saravanakumar AI Spend Audit Report",
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title: savingsText,
-      description:
-        "See the full breakdown of AI tool spending and savings opportunities.",
+      description: `Found potential AI spending savings of ${savingsAmount}/month. Compare with Saravanakumar benchmarks.`,
+      images: [`${baseUrl}/og-image.png`],
     },
     robots: { index: true, follow: true },
   };
 }
 
-// ---------------------------------------------------------------------------
-// Page component
-// ---------------------------------------------------------------------------
-
 export default async function SharePage({ params }: SharePageProps) {
   const { id } = await params;
   const input = decodePayload(id);
 
-  // If the URL is invalid, show a CTA to run their own audit
   if (!input) {
     return (
       <main className="min-h-screen bg-background text-foreground flex items-center justify-center px-6">
         <div className="glass rounded-2xl p-12 text-center max-w-md space-y-6 animate-slide-up">
-          <h1 className="text-3xl font-extrabold">Report Not Found</h1>
+          <h1 className="text-3xl font-extrabold">Report unavailable</h1>
           <p className="text-foreground/60">
-            This audit link appears to be invalid or has expired.
+            Decode failed — regenerate from the Saravanakumar Spend Lab landing page.
           </p>
           <Link
             href="/"
             className="inline-block rounded-full bg-accent-primary px-8 py-3 font-semibold text-white transition-all hover:bg-accent-primary-hover hover:shadow-lg hover:shadow-accent-glow hover:-translate-y-0.5"
           >
-            Run Your Free Audit →
+            Run audit
           </Link>
         </div>
       </main>
     );
   }
 
-  // ---- SECURITY: Strip PII before processing for the public page ----
   const sanitisedInput: AuditFormData = {
     ...input,
-    email: "redacted@private.com", // strip real email
-    companyName: undefined,        // strip company name
-    role: undefined,               // strip role
+    email: "redacted@example.com",
+    companyName: undefined,
+    role: undefined,
     teamSize: input.teamSize ?? 1,
   };
 
   const result = await calculateAudit(sanitisedInput);
   const aiSummary = await generateAISummary(result);
 
-  const totalMonthlySavings = result.totalMonthlySavings;
-  const totalAnnualSavings = result.totalAnnualSavings;
-  const HONESTY_THRESHOLD_INR = 8350;
-  const HIGH_SAVINGS_THRESHOLD_INR = 41750;
-  const isPerfectlyOptimised = totalMonthlySavings < HONESTY_THRESHOLD_INR;
-  const isHighSavings = totalMonthlySavings > HIGH_SAVINGS_THRESHOLD_INR;
+  const monthly = result.totalMonthlySavings;
+  const annual = result.totalAnnualSavings;
+  const optimised = monthly < MONTHLY_SAVINGS_HONEST_SMALL_USD;
+  const saravanakumarMoment = monthly > MONTHLY_SAVINGS_SARAVANAKUMAR_HIGHLIGHT_USD;
 
   return (
     <main className="min-h-screen bg-background text-foreground">
-      {/* Header */}
       <header className="border-b border-border bg-surface/80 backdrop-blur-md px-6 py-4 sticky top-0 z-50">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <Link href="/" className="text-xl font-bold gradient-text">
-            Saravanakumar AI Audit
+            Saravanakumar · Share preview
           </Link>
-          <Link
-            href="/"
-            className="rounded-full bg-accent-primary/10 px-5 py-2 text-sm font-semibold text-accent-primary transition-all duration-300 hover:bg-accent-primary hover:text-white hover:shadow-[0_0_20px_var(--accent-glow)]"
-          >
-            Run Your Own Audit →
-          </Link>
+          <div className="flex items-center gap-3">
+            <a
+              href={`/api/pdf/${id}`}
+              className="rounded-full bg-surface-elevated px-4 py-2 text-sm font-medium text-foreground/70 transition-all duration-300 hover:bg-accent-primary/20 hover:text-accent-primary border border-border"
+            >
+              Export PDF
+            </a>
+            <Link
+              href="/"
+              className="rounded-full bg-accent-primary/10 px-5 py-2 text-sm font-semibold text-accent-primary transition-all duration-300 hover:bg-accent-primary hover:text-white hover:shadow-[0_0_20px_var(--accent-glow)]"
+            >
+              Run your audit
+            </Link>
+          </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-5xl px-6 py-12 space-y-12 animate-slide-up">
-        {/* HERO */}
-        <section className="text-center space-y-6" aria-labelledby="share-hero-title">
-          <div className="inline-flex items-center gap-2 rounded-full bg-accent-glow border border-accent-primary/20 px-4 py-1.5 text-xs font-medium text-accent-primary">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-primary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-primary"></span>
-            </span>
-            Shared Audit Report
-          </div>
-
-          <h1
-            id="share-hero-title"
-            className="text-4xl md:text-5xl font-extrabold tracking-tight"
-          >
-            {isPerfectlyOptimised ? (
-              "This team is spending well."
+        <section className="text-center space-y-6 rounded-[32px] border border-white/10 bg-gradient-to-br from-surface via-background to-surface-elevated p-10">
+          <p className="text-xs uppercase tracking-[0.4em] text-accent-primary font-semibold">
+            Sanitised Saravanakumar excerpt
+          </p>
+          <h1 className="text-4xl md:text-6xl font-black tracking-tight">
+            {optimised ? (
+              "Spending calmly — benchmarks agree."
             ) : (
               <>
-                <span className="gradient-text">
-                  Rs {Math.round(totalAnnualSavings).toLocaleString("en-IN")}
-                </span>{" "}
-                in annual savings found.
+                <span className="gradient-text">{formatUsd(annual)}</span>{" "}
+                modeled annual airflow
               </>
             )}
           </h1>
-
-          <p className="text-lg text-foreground/60 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-lg text-foreground/70 max-w-2xl mx-auto leading-relaxed">
             {aiSummary}
           </p>
 
-          {/* Stat cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 stagger-children">
-            <div className="glass rounded-2xl p-8 border border-border" role="status" aria-label="Current monthly spend">
-              <p className="text-sm font-medium text-foreground/50 uppercase tracking-wider mb-2">
-                Current Monthly
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+            <div className="glass rounded-2xl p-8 border border-border">
+              <p className="text-xs uppercase tracking-wide text-foreground/50 mb-3">
+                Current USD / mo
               </p>
-              <p className="text-4xl font-bold text-danger">
-                Rs{" "}
-                {Math.round(result.totalCurrentMonthlySpend).toLocaleString(
-                  "en-IN"
-                )}
+              <p className="text-4xl font-black text-danger">
+                {formatUsd(result.totalCurrentMonthlySpend)}
               </p>
             </div>
-            <div className="glass rounded-2xl p-8 border border-border ring-2 ring-accent-primary/20" role="status" aria-label="Monthly savings">
-              <p className="text-sm font-medium text-accent-primary uppercase tracking-wider mb-2">
-                Monthly Savings
+            <div className="glass rounded-2xl p-8 border border-border ring-2 ring-accent-primary/30">
+              <p className="text-xs uppercase tracking-wide text-accent-primary mb-3">
+                Monthly savings
               </p>
-              <p className="text-4xl font-bold text-accent-primary">
-                Rs{" "}
-                {Math.round(totalMonthlySavings).toLocaleString("en-IN")}
+              <p className="text-5xl font-black text-accent-primary">
+                {formatUsd(monthly)}
               </p>
             </div>
-            <div className="glass rounded-2xl p-8 border border-border" role="status" aria-label="Annual savings">
-              <p className="text-sm font-medium text-success uppercase tracking-wider mb-2">
-                Annual Savings
+            <div className="glass rounded-2xl p-8 border border-border">
+              <p className="text-xs uppercase tracking-wide text-success mb-3">
+                Annual savings
               </p>
-              <p className="text-4xl font-bold text-success">
-                Rs{" "}
-                {Math.round(totalAnnualSavings).toLocaleString("en-IN")}
-              </p>
+              <p className="text-5xl font-black text-success">{formatUsd(annual)}</p>
             </div>
           </div>
         </section>
 
-        {/* HONESTY FILTER / HIGH-SAVINGS CTA */}
-        {isPerfectlyOptimised ? (
-          <section className="glass rounded-2xl p-10 border border-success/30 bg-success/5 text-center" aria-label="Optimisation status">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/20 text-success mb-6">
-              <svg
-                className="w-8 h-8"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-bold mb-3">Stack is well-optimised.</h2>
-            <p className="text-foreground/70 max-w-xl mx-auto">
-              No fake savings here. This AI stack is running efficiently for the
-              current team size.
-            </p>
-          </section>
-        ) : isHighSavings ? (
-          <section className="glass rounded-2xl p-10 border border-accent-primary/30 bg-accent-primary/5 text-center" aria-label="High savings detected">
-            <h2 className="text-3xl font-bold mb-4 text-accent-primary">
-              Massive Savings Detected
+        {saravanakumarMoment && (
+          <section className="rounded-3xl border border-accent-secondary/35 bg-accent-primary/15 px-8 py-10 text-center shadow-lg space-y-4">
+            <h2 className="text-3xl font-black text-white">
+              Saravanakumar is how teams monetize benchmarks
             </h2>
-            <p className="text-lg text-foreground/80 max-w-2xl mx-auto mb-8">
-              This team is overspending by more than Rs 40,000 every month.
-              Saravanakumar can help restructure licenses and negotiate
-              enterprise volume discounts.
+            <p className="text-white/85 text-lg max-w-3xl mx-auto">
+              Forecasted savings crest{" "}
+              <span className="font-semibold">{formatUsd(MONTHLY_SAVINGS_SARAVANAKUMAR_HIGHLIGHT_USD)}</span>{" "}
+              / month — Saravanakumar plugs legal, procurement, and FinOps workflows so
+              the upside survives signature.
             </p>
-            <Link
-              href="/"
-              className="inline-block bg-accent-primary hover:bg-accent-primary-hover text-white font-bold py-4 px-10 rounded-full shadow-lg shadow-accent-glow transition-all hover:-translate-y-1 text-lg animate-pulse-glow"
-            >
-              Run Your Own Audit
-            </Link>
           </section>
+        )}
+
+        {optimised ? (
+          <OptimizationNotifySignup muted />
         ) : null}
 
-        {/* LINE-ITEM BREAKDOWN */}
-        <section className="space-y-6" aria-label="Tool-by-tool analysis">
-          <h3 className="text-2xl font-bold">Line-Item Analysis</h3>
-          <div className="space-y-4 stagger-children">
+        <section className="space-y-4">
+          <h3 className="text-2xl font-bold">Line items (USD)</h3>
+          <div className="space-y-4">
             {result.toolResults.map((tool, idx) => (
               <div
                 key={idx}
-                className="glass p-6 rounded-xl border border-border flex flex-col md:flex-row gap-6 items-start md:items-center justify-between"
+                className="glass p-6 rounded-xl border border-border flex flex-col gap-4 md:flex-row md:items-start md:justify-between"
               >
-                <div className="min-w-[140px]">
-                  <h4 className="font-bold text-lg">{tool.toolName}</h4>
-                  <p className="text-sm text-foreground/50">
-                    Current: {tool.currentPlan}
+                <div className="min-w-[200px]">
+                  <p className="text-xs uppercase text-foreground/50">
+                    {tool.toolName}
+                  </p>
+                  <h4 className="text-xl font-black">{tool.currentPlan}</h4>
+                  <p className="text-sm text-danger font-semibold mt-2">
+                    {formatUsd(tool.currentMonthlyCost)} / mo modeled
                   </p>
                 </div>
-
-                <div className="flex-1 max-w-xl text-sm bg-background/50 p-4 rounded-lg border border-border/50">
-                  <p className="font-medium text-foreground/80">
-                    {tool.reasoning}
+                <div className="flex-1 text-sm bg-background/50 p-4 rounded-lg border border-border/60 space-y-2">
+                  <p className="text-xs uppercase text-foreground/50">
+                    Action · savings
                   </p>
-                </div>
-
-                <div className="text-right min-w-[130px]">
-                  <p className="text-sm text-foreground/50">
-                    Potential Savings
-                  </p>
-                  <p
-                    className={`font-bold text-lg ${
-                      tool.monthlySavings > 0
-                        ? "text-accent-primary"
-                        : "text-foreground/30"
-                    }`}
-                  >
+                  <p className="font-semibold text-foreground">
                     {tool.monthlySavings > 0
-                      ? `+ Rs ${Math.round(tool.monthlySavings).toLocaleString("en-IN")}/mo`
-                      : "Optimised"}
+                      ? `${tool.recommendedAction} → save ${formatUsd(tool.monthlySavings)} / mo`
+                      : `${tool.recommendedAction}`}
+                  </p>
+                  <p className="text-foreground/70 leading-relaxed">{tool.reasoning}</p>
+                </div>
+                <div className="text-right min-w-[140px]">
+                  <p className="text-xs text-foreground/50 uppercase">Post move</p>
+                  <p className="text-3xl font-black text-success">
+                    {formatUsd(
+                      Math.max(tool.currentMonthlyCost - tool.monthlySavings, 0)
+                    )}
                   </p>
                 </div>
               </div>
@@ -296,23 +254,21 @@ export default async function SharePage({ params }: SharePageProps) {
           </div>
         </section>
 
-        {/* CTA Footer */}
-        <section className="text-center pt-4 pb-8 space-y-4" aria-label="Call to action">
-          <p className="text-foreground/50 text-sm">
-            Want your own personalised audit?
-          </p>
+        <section className="text-center space-y-4 pb-12">
           <Link
             href="/"
-            className="inline-block rounded-full bg-accent-primary px-10 py-4 font-bold text-white text-lg transition-all hover:bg-accent-primary-hover hover:shadow-lg hover:shadow-accent-glow hover:-translate-y-0.5"
+            className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-accent-primary to-accent-secondary px-10 py-4 text-lg font-semibold text-white shadow-lg hover:-translate-y-0.5 transition"
           >
-            Start Free Audit →
+            Clone this audit stack
           </Link>
+          <p className="text-sm text-foreground/50">
+            Public link strips inbox + company specifics — deterministic math stays.
+          </p>
         </section>
       </div>
 
       <footer className="border-t border-border/50 px-6 py-6 text-center text-xs text-foreground/30">
-        Pricing benchmarks verified May 2026. This report contains no
-        personally identifiable information.
+        Benchmarks anchored {result.pricingReferenceDate}. No PII in this route.
       </footer>
     </main>
   );

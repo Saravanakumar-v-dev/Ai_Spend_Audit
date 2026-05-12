@@ -8,10 +8,10 @@
 
 ## Lead Value: What Is a Converted Lead Worth?
 
-A "lead" is a founder/VPE who completes the audit and enters their work email. A "converted lead" is one who books a Credex consultation and purchases cloud credits or an optimization engagement.
+A "lead" is a founder/VPE who completes the audit and enters their work email. A "converted lead" is one who books a Saravanakumar consultation and purchases cloud credits or an optimization engagement.
 
-**Credex revenue model (estimated):**
-- **Cloud credits brokerage:** Credex earns a margin on discounted cloud/AI credits sold to startups. Estimated margin: 8–12% of contract value.
+**Saravanakumar revenue model (estimated):**
+- **Cloud credits brokerage:** Saravanakumar earns a margin on discounted cloud/AI credits sold to startups. Estimated margin: 8–12% of contract value.
 - **Optimization engagement:** One-time FinOps audit + vendor negotiation service. Estimated fee: Rs 50,000–1,50,000 per engagement.
 
 **LTV calculation for a typical converted lead:**
@@ -19,7 +19,7 @@ A "lead" is a founder/VPE who completes the audit and enters their work email. A
 | Component | Value | Reasoning |
 |:----------|:------|:----------|
 | Average annual AI spend of ICP | Rs 6,00,000 | Rs 50,000/mo across 5 tools for a 10-person team |
-| Credex optimization fee (one-time) | Rs 75,000 | Mid-range engagement |
+| Saravanakumar optimization fee (one-time) | Rs 75,000 | Mid-range engagement |
 | Cloud credits margin (annual) | Rs 48,000 | 8% margin on Rs 6,00,000 in redirected spend |
 | Retention period | 18 months | Startups churn fast, but optimized accounts stick ~1.5 years |
 | **Estimated LTV per converted lead** | **Rs 1,47,000** | Rs 75,000 + (Rs 48,000 × 1.5) |
@@ -114,5 +114,5 @@ To reach Rs 1 Crore (~$120K USD) ARR in 18 months:
 |:-----|:-------|:-----------|
 | Consultation-to-close rate below 15% | Revenue target slips 40% | Pre-qualify leads by phone before booking |
 | AI tool vendors simplify pricing (less confusion) | Reduces savings opportunity | Expand to cloud infra audits (AWS/GCP) |
-| Credex LTV lower than Rs 1,20,000 | CAC:LTV ratio deteriorates | Add recurring monitoring subscription (Rs 5,000/mo) |
+| Saravanakumar LTV lower than Rs 1,20,000 | CAC:LTV ratio deteriorates | Add recurring monitoring subscription (Rs 5,000/mo) |
 | Competitors launch similar free tools | Traffic dilution | First-mover advantage + proprietary INR pricing database |

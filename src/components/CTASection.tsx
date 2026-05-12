@@ -44,7 +44,7 @@ export default function CTASection() {
         </p>
 
         <a
-          href="https://saravanakumar.com/contact"
+          href="https://saravanakumar-v-portfolio.vercel.app/"
           target="_blank"
           rel="noopener noreferrer"
           id="cta-book-consultation"
@@ -52,7 +52,7 @@ export default function CTASection() {
         >
           <div className="absolute inset-0 bg-gradient-to-r from-accent-secondary to-accent-tertiary opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           <span className="relative flex items-center gap-2 font-poppins">
-            Book a Free Consultation
+            Contact Saravanakumar
             <svg
               className="h-5 w-5 group-hover:translate-x-1 transition-transform"
               fill="none"

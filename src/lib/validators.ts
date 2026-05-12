@@ -45,6 +45,19 @@ export const ToolSelectionSchema = z.object({
     .min(0, "Active users cannot be negative")
     .max(10000)
     .optional(),
+  /** Billed seats/licenses for this row (per-seat tools). Falls back to quantity or team size in the engine. */
+  seatCount: z
+    .number()
+    .int()
+    .min(1)
+    .max(10000)
+    .optional(),
+  /** When set, treat this as the invoice-truth current monthly spend (USD). */
+  reportedMonthlySpendUsd: z
+    .number()
+    .min(0)
+    .max(10_000_000)
+    .optional(),
 });
 export type ToolSelection = z.infer<typeof ToolSelectionSchema>;
 
@@ -67,6 +80,7 @@ export const AuditFormSchema = z.object({
     .max(255, "Email is too long")
     .trim()
     .toLowerCase(),
+  primaryUseCase: z.enum(["coding", "writing", "data", "research", "mixed"]).optional(),
   tools: z
     .array(ToolSelectionSchema)
     .min(1, "Please select at least one AI tool")
@@ -80,6 +94,7 @@ export const ToolAuditResultSchema = z.object({
   currentPlan: z.string(),
   currentMonthlyCost: z.number(),
   recommendedPlan: z.string().optional(),
+  recommendedAction: z.string().optional(),
   recommendedMonthlyCost: z.number().optional(),
   monthlySavings: z.number(),
   savingsPercentage: z.number(),
@@ -91,7 +106,7 @@ export const ToolAuditResultSchema = z.object({
 export type ToolAuditResult = z.infer<typeof ToolAuditResultSchema>;
 
 export const AuditResultSchema = z.object({
-  currency: z.literal("INR"),
+  currency: z.literal("USD"),
   pricingReferenceDate: z.string(),
   totalCurrentMonthlySpend: z.number(),
   totalOptimizedMonthlySpend: z.number(),

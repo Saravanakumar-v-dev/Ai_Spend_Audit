@@ -154,7 +154,7 @@ graph TD
     C -->|< Rs 8,350| D[Honesty Filter]
     D -->|Render| E["You're spending well" + Email Capture]
     C -->|> Rs 41,750| F[High-Savings Filter]
-    F -->|Render| G["Book a Credex Consultation" CTA]
+    F -->|Render| G["Book a Saravanakumar Consultation" CTA]
     C -->|Normal Range| H[Standard Render]
     H -->|Render| I[Line-Item Analysis Breakdown]
 ```

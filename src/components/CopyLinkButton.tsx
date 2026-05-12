@@ -19,24 +19,39 @@ export default function CopyLinkButton({
   label = "Copy Link",
 }: CopyLinkButtonProps) {
   const [copied, setCopied] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const handleCopy = async () => {
-    const textToCopy = url || window.location.href;
+    const textToCopy = url
+      ? new URL(url, window.location.origin).href
+      : window.location.href;
+    setFailed(false);
+
     try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard API unavailable");
+      }
       await navigator.clipboard.writeText(textToCopy);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
     } catch {
       // Fallback for older browsers
       const textarea = document.createElement("textarea");
       textarea.value = textToCopy;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
       document.body.appendChild(textarea);
       textarea.select();
-      document.execCommand("copy");
+      const copiedWithFallback = document.execCommand("copy");
       document.body.removeChild(textarea);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (!copiedWithFallback) {
+        setFailed(true);
+        setTimeout(() => setFailed(false), 2500);
+        return;
+      }
     }
+
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -49,7 +64,9 @@ export default function CopyLinkButton({
       }`}
       aria-label={copied ? "Link copied to clipboard" : label}
     >
-      {copied ? (
+      {failed ? (
+        <span className="flex items-center gap-1.5">Copy failed</span>
+      ) : copied ? (
         <span className="flex items-center gap-1.5">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />

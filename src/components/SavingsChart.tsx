@@ -7,6 +7,8 @@
 
 "use client";
 
+import { formatUsd } from "@/lib/format-usd";
+
 interface ToolBreakdown {
   toolName: string;
   currentCost: number;
@@ -58,11 +60,11 @@ export default function SavingsChart({
           <div className="flex gap-6 text-xs font-semibold">
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-sm bg-danger/60 inline-block" />
-              Current: Rs {Math.round(currentSpend).toLocaleString("en-IN")}
+              Current {formatUsd(currentSpend)}
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-sm bg-success/60 inline-block" />
-              Optimized: Rs {Math.round(optimizedSpend).toLocaleString("en-IN")}
+              Optimized {formatUsd(optimizedSpend)}
             </span>
           </div>
         </div>
@@ -107,11 +109,10 @@ export default function SavingsChart({
                   {tool.toolName}
                 </span>
                 <span className="text-xs text-foreground/50 font-inter">
-                  Rs {Math.round(tool.currentCost).toLocaleString("en-IN")}/mo
+                  {formatUsd(tool.currentCost)}/mo
                   {hasSavings && (
                     <span className="text-accent-primary ml-2 font-semibold">
-                      → Rs{" "}
-                      {Math.round(tool.currentCost - tool.savings).toLocaleString("en-IN")}
+                      → {formatUsd(tool.currentCost - tool.savings)}
                     </span>
                   )}
                 </span>
@@ -139,7 +140,7 @@ export default function SavingsChart({
 
               {hasSavings && (
                 <p className="text-xs text-accent-primary/80 mt-1 font-inter">
-                  Save Rs {Math.round(tool.savings).toLocaleString("en-IN")}/mo
+                  Save {formatUsd(tool.savings)}/mo
                 </p>
               )}
             </div>

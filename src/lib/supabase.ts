@@ -10,7 +10,9 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabasePublishableKey =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 let _supabase: SupabaseClient | null = null;
@@ -29,7 +31,13 @@ export function getSupabase(): SupabaseClient {
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL environment variable");
   }
 
-  _supabase = createClient(supabaseUrl, supabaseAnonKey || "");
+  if (!supabasePublishableKey) {
+    throw new Error(
+      "Missing NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY environment variable"
+    );
+  }
+
+  _supabase = createClient(supabaseUrl, supabasePublishableKey);
   return _supabase;
 }
 

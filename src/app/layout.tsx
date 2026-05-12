@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AI Spend Audit | Saravanakumar — Find Where Your Team Overspends on AI",
+  title: "Saravanakumar AI Spend Audit · USD-native benchmarking",
   description:
-    "Free AI spend audit for startups. Discover how much your team spends on Cursor, Copilot, ChatGPT, Claude, and more — and where you can save.",
+    "Free AI spend audit: Cursor, Copilot, Claude, ChatGPT, Gemini, Anthropic & OpenAI APIs, v0 — modeled in USD with honest savings thresholds.",
   keywords: [
     "AI spend audit",
     "AI cost optimization",
@@ -16,16 +16,16 @@ export const metadata: Metadata = {
     "AI tool comparison",
   ],
   openGraph: {
-    title: "AI Spend Audit by Saravanakumar",
+    title: "Saravanakumar Spend Lab · AI vendor audit",
     description:
-      "Find out how much your team is overspending on AI tools. Free personalized audit report.",
+      "Deterministic USD benchmarking for every major AI SKU — screenshot-ready savings for leadership reviews.",
     type: "website",
     locale: "en_US",
-    siteName: "Saravanakumar AI Spend Audit",
+    siteName: "Saravanakumar Spend Lab",
   },
   twitter: {
     card: "summary_large_image",
-    title: "AI Spend Audit by Saravanakumar",
+    title: "Saravanakumar Spend Lab · AI vendor audit",
     description:
       "Find out how much your team is overspending on AI tools. Free personalized audit report.",
   },

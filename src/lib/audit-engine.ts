@@ -1,30 +1,24 @@
 /**
  * Audit Engine - AI Spend Audit
  *
- * Calculates current spend and savings opportunities using INR-native pricing.
- * Values are stored in INR so the audit does not rely on a runtime
- * USD-to-INR conversion step.
- *
- * Pricing basis as of May 8, 2026:
- * - ChatGPT Business: official INR price from OpenAI's India-localized
- *   business pricing page.
- * - Other plans/models: official public USD pricing converted once into fixed
- *   INR reference amounts using a May 7, 2026 reference rate of 1 USD = Rs 94.37.
+ * Deterministic benchmarks in USD only (no INR or runtime FX conversion).
+ * Pricing snapshot as of submission week (May 2026).
  */
 
 import type { AuditFormData, AuditResult, ToolAuditResult } from "./validators";
+import { formatUsd } from "./format-usd";
 
 type SubscriptionBilling = "flat" | "per_seat";
 
 interface SubscriptionPlanPrice {
-  priceInInr: number;
-  annualMonthlyPriceInInr?: number;
+  priceInUsd: number;
+  annualMonthlyPriceInUsd?: number;
   billing: SubscriptionBilling;
 }
 
 interface ApiModelPrice {
-  inputPerMillionInr: number;
-  outputPerMillionInr: number;
+  inputPerMillionUsd: number;
+  outputPerMillionUsd: number;
 }
 
 const PRICING_REFERENCE_DATE = "2026-05-08";
@@ -33,88 +27,98 @@ const MILLION_TOKENS = 1_000_000;
 const TOOL_NAMES: Record<string, string> = {
   cursor: "Cursor",
   copilot: "GitHub Copilot",
-  claude: "Claude",
+  claude: "Claude (chat)",
   chatgpt: "ChatGPT",
-  api_anthropic_sonnet: "Anthropic API (Claude Sonnet 4)",
-  api_openai_gpt5_4: "OpenAI API (GPT-5.4)",
-  api_gemini_3_pro: "Gemini API (Gemini 2.5 Pro)",
+  gemini: "Gemini (Google AI)",
+  v0: "v0",
+  api_anthropic_sonnet: "Anthropic API (frontier Claude)",
+  api_anthropic_haiku: "Anthropic API (Haiku-class)",
+  api_openai_gpt5_4: "OpenAI API (frontier model)",
+  api_openai_4o_mini: "OpenAI API (GPT-4o-mini)",
+  api_gemini_3_pro: "Gemini API (Pro-class)",
+  api_gemini_flash: "Gemini API (Flash-class)",
 };
 
-const SUBSCRIPTION_PRICING: Record<string, Record<string, SubscriptionPlanPrice>> = {
+export const SUBSCRIPTION_PRICING_PUBLIC: Record<
+  string,
+  Record<string, SubscriptionPlanPrice>
+> = {
   cursor: {
-    pro: { priceInInr: 1887.4, billing: "flat" },
-    teams: { priceInInr: 3774.8, billing: "per_seat" },
+    hobby: { priceInUsd: 0, billing: "flat" },
+    pro: { priceInUsd: 20, billing: "flat" },
+    business: { priceInUsd: 40, billing: "per_seat" },
+    enterprise: { priceInUsd: 45, billing: "per_seat" },
   },
   copilot: {
-    individual: { priceInInr: 943.7, billing: "flat" },
-    business: { priceInInr: 1793.03, billing: "per_seat" },
-    enterprise: { priceInInr: 3680.43, billing: "per_seat" },
+    individual: {
+      priceInUsd: 10,
+      annualMonthlyPriceInUsd: 8.33,
+      billing: "flat",
+    },
+    business: { priceInUsd: 19, billing: "per_seat" },
+    enterprise: { priceInUsd: 39, billing: "per_seat" },
   },
   claude: {
-    pro: { priceInInr: 1887.4, billing: "flat" },
-    team_standard: {
-      priceInInr: 2831.1,
-      annualMonthlyPriceInInr: 2359.25,
-      billing: "per_seat",
-    },
-    team_premium: { priceInInr: 14155.5, billing: "per_seat" },
+    free: { priceInUsd: 0, billing: "flat" },
+    pro: { priceInUsd: 20, billing: "flat" },
+    max: { priceInUsd: 100, billing: "flat" },
+    team: { priceInUsd: 30, annualMonthlyPriceInUsd: 25, billing: "per_seat" },
+    enterprise: { priceInUsd: 45, billing: "per_seat" },
   },
   chatgpt: {
-    plus: { priceInInr: 1887.4, billing: "flat" },
-    pro: { priceInInr: 18874, billing: "flat" },
-    business: {
-      priceInInr: 2359.25,
-      annualMonthlyPriceInInr: 1800,
-      billing: "per_seat",
+    plus: { priceInUsd: 20, billing: "flat" },
+    team: { priceInUsd: 30, annualMonthlyPriceInUsd: 25, billing: "per_seat" },
+    enterprise: { priceInUsd: 60, billing: "per_seat" },
+  },
+  gemini: {
+    pro: { priceInUsd: 20, billing: "flat" },
+    ultra: { priceInUsd: 20, billing: "flat" },
+  },
+  v0: {
+    free: { priceInUsd: 0, billing: "flat" },
+    premium: { priceInUsd: 20, billing: "flat" },
+  },
+};
+
+const SUBSCRIPTION_PRICING = SUBSCRIPTION_PRICING_PUBLIC;
+
+export const API_PRICING_USD: Record<string, ApiModelPrice> = {
+  api_anthropic_sonnet: { inputPerMillionUsd: 3, outputPerMillionUsd: 15 },
+  api_openai_gpt5_4: { inputPerMillionUsd: 2.5, outputPerMillionUsd: 15 },
+  api_gemini_3_pro: { inputPerMillionUsd: 1.25, outputPerMillionUsd: 10 },
+  api_anthropic_haiku: { inputPerMillionUsd: 0.8, outputPerMillionUsd: 4 },
+  api_openai_4o_mini: { inputPerMillionUsd: 0.15, outputPerMillionUsd: 0.6 },
+  api_gemini_flash: { inputPerMillionUsd: 0.075, outputPerMillionUsd: 0.3 },
+};
+
+const API_CHEAPER_ALTERNATIVES: Record<string, { slug: string; name: string }> =
+  {
+    api_anthropic_sonnet: {
+      slug: "api_anthropic_haiku",
+      name: "Anthropic Haiku-class for routine workloads",
     },
-  },
-};
-
-const API_PRICING: Record<string, ApiModelPrice> = {
-  api_anthropic_sonnet: {
-    inputPerMillionInr: 283.11,
-    outputPerMillionInr: 1415.55,
-  },
-  api_openai_gpt5_4: {
-    inputPerMillionInr: 235.93,
-    outputPerMillionInr: 1415.55,
-  },
-  api_gemini_3_pro: {
-    inputPerMillionInr: 117.96,
-    outputPerMillionInr: 943.7,
-  },
-  // Cheaper models used for right-sizing suggestions
-  api_anthropic_haiku: {
-    inputPerMillionInr: 75.5,     // Claude Haiku 3.5 — ~$0.80/M input
-    outputPerMillionInr: 377.48,   // ~$4/M output
-  },
-  api_openai_4o_mini: {
-    inputPerMillionInr: 14.16,     // GPT-4o-mini — ~$0.15/M input
-    outputPerMillionInr: 56.62,    // ~$0.60/M output
-  },
-  api_gemini_flash: {
-    inputPerMillionInr: 7.08,      // Gemini 2.5 Flash — ~$0.075/M input
-    outputPerMillionInr: 28.31,    // ~$0.30/M output
-  },
-};
-
-// Map each premium API model to its cheaper alternative for right-sizing
-const API_CHEAPER_ALTERNATIVES: Record<string, { slug: string; name: string }> = {
-  api_anthropic_sonnet: { slug: "api_anthropic_haiku", name: "Claude Haiku 3.5 (for routine tasks)" },
-  api_openai_gpt5_4: { slug: "api_openai_4o_mini", name: "GPT-4o-mini (for routine tasks)" },
-  api_gemini_3_pro: { slug: "api_gemini_flash", name: "Gemini 2.5 Flash (for routine tasks)" },
-};
+    api_openai_gpt5_4: {
+      slug: "api_openai_4o_mini",
+      name: "GPT-4o-mini for routine workloads",
+    },
+    api_gemini_3_pro: {
+      slug: "api_gemini_flash",
+      name: "Gemini Flash for routine workloads",
+    },
+  };
 
 function roundCurrency(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function formatInr(value: number): string {
-  return `Rs ${Math.round(value).toLocaleString("en-IN")}`;
-}
-
 function getToolName(toolSlug: string): string {
   return TOOL_NAMES[toolSlug] ?? toolSlug.replaceAll("_", " ");
+}
+
+function getBillingSeats(tool: AuditFormData["tools"][number], teamSize: number): number {
+  const seats = tool.seatCount ?? tool.quantity;
+  if (tool.toolSlug.startsWith("api_")) return Math.max(teamSize, 1);
+  return Math.max(seats, 1);
 }
 
 function getSubscriptionPlan(
@@ -128,31 +132,36 @@ function getEffectivePlanPrice(
   plan: SubscriptionPlanPrice,
   billingCycle: "monthly" | "annual"
 ): number {
-  if (billingCycle === "annual" && plan.annualMonthlyPriceInInr) {
-    return plan.annualMonthlyPriceInInr;
+  if (billingCycle === "annual" && plan.annualMonthlyPriceInUsd) {
+    return plan.annualMonthlyPriceInUsd;
   }
-
-  return plan.priceInInr;
+  return plan.priceInUsd;
 }
 
 function calculateSubscriptionCost(
   toolSlug: string,
   planName: string,
+  billingSeats: number,
   quantity: number,
-  teamSize: number,
   billingCycle: "monthly" | "annual"
 ): number {
   const plan = getSubscriptionPlan(toolSlug, planName);
-
-  if (!plan) {
-    return 0;
-  }
+  if (!plan) return 0;
 
   const planPrice = getEffectivePlanPrice(plan, billingCycle);
   const monthlyCost =
-    plan.billing === "per_seat" ? planPrice * teamSize : planPrice * quantity;
+    plan.billing === "per_seat" ? planPrice * billingSeats : planPrice * quantity;
 
   return roundCurrency(monthlyCost);
+}
+
+function buildRecommendedAction(tool: ToolAuditResult): string {
+  if (tool.monthlySavings <= 0) return "Keep existing plan";
+  if (!tool.recommendedPlan) return "Revisit quota, billing cadence, or usage mix";
+  if (tool.recommendedPlan === "Cancel / Consolidate") {
+    return "Cancel duplicate coverage and consolidate spend";
+  }
+  return `Adopt ${tool.recommendedPlan}`;
 }
 
 export async function calculateAudit(
@@ -164,97 +173,115 @@ export async function calculateAudit(
   const toolResults: ToolAuditResult[] = [];
   const recommendations: string[] = [];
 
-  const toolSlugs = formData.tools.map((tool) => tool.toolSlug);
+  const toolSlugs = formData.tools.map((t) => t.toolSlug);
 
   for (const tool of formData.tools) {
-    let currentCost = 0;
-    let optimizedCost = 0;
     let recommendationStr = "";
     let recommendedPlan: string | undefined;
     const isApi = tool.toolSlug.startsWith("api_");
 
+    let canonicalCost = 0;
     if (isApi) {
-      const apiPricing = API_PRICING[tool.toolSlug];
-
+      const apiPricing = API_PRICING_USD[tool.toolSlug];
       if (apiPricing) {
-        // Fallback to moderate usage if tokens aren't provided by the frontend
         let inputTokens = tool.estimatedMonthlyTokens?.inputTokens;
         let outputTokens = tool.estimatedMonthlyTokens?.outputTokens;
-        
         if (!inputTokens && !outputTokens) {
           inputTokens = 10 * MILLION_TOKENS;
           outputTokens = 2 * MILLION_TOKENS;
         }
-
         const inputCost =
-          ((inputTokens || 0) / MILLION_TOKENS) *
-          apiPricing.inputPerMillionInr;
+          ((inputTokens || 0) / MILLION_TOKENS) * apiPricing.inputPerMillionUsd;
         const outputCost =
-          ((outputTokens || 0) / MILLION_TOKENS) *
-          apiPricing.outputPerMillionInr;
-
-        currentCost = roundCurrency(inputCost + outputCost);
+          ((outputTokens || 0) / MILLION_TOKENS) * apiPricing.outputPerMillionUsd;
+        canonicalCost = roundCurrency(inputCost + outputCost);
       }
+    } else {
+      const billingSeats = getBillingSeats(tool, teamSize);
+      canonicalCost = calculateSubscriptionCost(
+        tool.toolSlug,
+        tool.planName,
+        billingSeats,
+        tool.quantity,
+        tool.billingCycle
+      );
+    }
 
-      optimizedCost = currentCost;
+    let currentCost = roundCurrency(
+      tool.reportedMonthlySpendUsd ?? canonicalCost
+    );
+    let optimizedCost = canonicalCost;
 
-      // ── NEW RULE: API Right-Sizing ──────────────────────────────────
-      // Suggest a cheaper model if one exists in the same vendor family
-      const cheaperModel = API_CHEAPER_ALTERNATIVES[tool.toolSlug];
-      if (cheaperModel) {
-        const cheaperPricing = API_PRICING[cheaperModel.slug];
-        if (cheaperPricing) {
-          const inputTokens = tool.estimatedMonthlyTokens?.inputTokens || 10 * MILLION_TOKENS;
-          const outputTokens = tool.estimatedMonthlyTokens?.outputTokens || 2 * MILLION_TOKENS;
-          const cheaperInputCost = (inputTokens / MILLION_TOKENS) * cheaperPricing.inputPerMillionInr;
-          const cheaperOutputCost = (outputTokens / MILLION_TOKENS) * cheaperPricing.outputPerMillionInr;
-          const cheaperTotal = roundCurrency(cheaperInputCost + cheaperOutputCost);
+    if (isApi && tool.reportedMonthlySpendUsd != null) {
+      currentCost = roundCurrency(tool.reportedMonthlySpendUsd);
+    }
 
-          if (cheaperTotal < optimizedCost) {
-            optimizedCost = cheaperTotal;
-            recommendedPlan = cheaperModel.name;
-            recommendationStr = `For routine tasks (summarization, classification, simple Q&A), ${cheaperModel.name} costs ${formatInr(cheaperTotal)}/mo vs ${formatInr(currentCost)}/mo — saving ${formatInr(currentCost - cheaperTotal)}/mo. Reserve ${getToolName(tool.toolSlug)} for complex reasoning tasks only.`;
+    if (isApi) {
+      const apiPricing = API_PRICING_USD[tool.toolSlug];
+      if (apiPricing) {
+        optimizedCost = canonicalCost;
+        const cheaperModel = API_CHEAPER_ALTERNATIVES[tool.toolSlug];
+        if (cheaperModel) {
+          const cheaperPricing = API_PRICING_USD[cheaperModel.slug];
+          if (cheaperPricing) {
+            const inputTokens =
+              tool.estimatedMonthlyTokens?.inputTokens || 10 * MILLION_TOKENS;
+            const outputTokens =
+              tool.estimatedMonthlyTokens?.outputTokens || 2 * MILLION_TOKENS;
+            const cheaperInputCost =
+              (inputTokens / MILLION_TOKENS) * cheaperPricing.inputPerMillionUsd;
+            const cheaperOutputCost =
+              (outputTokens / MILLION_TOKENS) *
+              cheaperPricing.outputPerMillionUsd;
+            const cheaperTotal = roundCurrency(
+              cheaperInputCost + cheaperOutputCost
+            );
+            if (cheaperTotal < optimizedCost) {
+              optimizedCost = cheaperTotal;
+              recommendedPlan = cheaperModel.name;
+              recommendationStr = `For routine workloads, ${cheaperModel.name} trims spend to ${formatUsd(cheaperTotal)}/mo vs ${formatUsd(canonicalCost)}/mo on this frontier model (${formatUsd(canonicalCost - cheaperTotal)}/mo saved)—keep frontier models for the hardest prompts only.`;
+            }
           }
         }
       }
     } else {
-      currentCost = calculateSubscriptionCost(
-        tool.toolSlug,
-        tool.planName,
-        tool.quantity,
-        teamSize,
-        tool.billingCycle
-      );
-      optimizedCost = currentCost;
+      const billingSeats = getBillingSeats(tool, teamSize);
 
-      // ── NEW RULE: Annual Billing Suggestion ────────────────────────
-      // If the user pays monthly but the annual rate is cheaper, suggest switching
       if (tool.billingCycle === "monthly") {
         const plan = getSubscriptionPlan(tool.toolSlug, tool.planName);
-        if (plan && plan.annualMonthlyPriceInInr && plan.annualMonthlyPriceInInr < plan.priceInInr) {
-          const annualCost = plan.billing === "per_seat"
-            ? roundCurrency(plan.annualMonthlyPriceInInr * teamSize)
-            : roundCurrency(plan.annualMonthlyPriceInInr * tool.quantity);
-          
-          if (annualCost < optimizedCost) {
-            const monthlySaved = optimizedCost - annualCost;
+        if (
+          plan &&
+          plan.annualMonthlyPriceInUsd &&
+          plan.annualMonthlyPriceInUsd < plan.priceInUsd
+        ) {
+          const annualCost =
+            plan.billing === "per_seat"
+              ? roundCurrency(plan.annualMonthlyPriceInUsd * billingSeats)
+              : roundCurrency(plan.annualMonthlyPriceInUsd * tool.quantity);
+
+          const monthlyBaseline = calculateSubscriptionCost(
+            tool.toolSlug,
+            tool.planName,
+            billingSeats,
+            tool.quantity,
+            "monthly"
+          );
+
+          if (annualCost < monthlyBaseline && annualCost < optimizedCost) {
             optimizedCost = annualCost;
             recommendedPlan = `${tool.planName} (annual billing)`;
-            recommendationStr = `Switch from monthly to annual billing to save ${formatInr(monthlySaved)}/mo (${formatInr(monthlySaved * 12)}/year). Same plan, same features — just a billing change.`;
+            recommendationStr = `Annual billing lowers the equivalent monthly rate to ${formatUsd(annualCost)} vs ${formatUsd(monthlyBaseline)} on monthly—same SKU, purely a billing lever.`;
           }
         }
       }
 
-      // ── NEW RULE: Unused Seat Detection ─────────────────────────────
-      // If activeUsers is provided and less than teamSize, flag wasted seats
+      const planBilling = getSubscriptionPlan(tool.toolSlug, tool.planName)?.billing;
       if (
         tool.activeUsers !== undefined &&
-        tool.activeUsers < teamSize &&
-        ["per_seat"].includes(
-          getSubscriptionPlan(tool.toolSlug, tool.planName)?.billing || ""
-        )
+        planBilling === "per_seat" &&
+        tool.activeUsers < billingSeats
       ) {
-        const unusedSeats = teamSize - tool.activeUsers;
+        const unusedSeats = billingSeats - tool.activeUsers;
         const plan = getSubscriptionPlan(tool.toolSlug, tool.planName)!;
         const perSeatPrice = getEffectivePlanPrice(plan, tool.billingCycle);
         const rightSizedCost = roundCurrency(perSeatPrice * tool.activeUsers);
@@ -263,43 +290,69 @@ export async function calculateAudit(
           const wastedAmount = optimizedCost - rightSizedCost;
           optimizedCost = rightSizedCost;
           recommendedPlan = `${tool.planName} (${tool.activeUsers} seats)`;
-          recommendationStr = `You're paying for ${teamSize} seats but only ${tool.activeUsers} engineers actively use ${getToolName(tool.toolSlug)}. Removing ${unusedSeats} unused seat${unusedSeats > 1 ? "s" : ""} saves ${formatInr(wastedAmount)}/mo.`;
+          recommendationStr = `Billing reflects ${billingSeats} seats but usage shows ${tool.activeUsers} active users—dropping ${unusedSeats} unused seat${unusedSeats > 1 ? "s" : ""} saves ${formatUsd(wastedAmount)}/mo.`;
         }
       }
 
-      // ── EXISTING RULE: Small Team Overkill ──────────────────────────
       if (
         teamSize <= 2 &&
-        ["teams", "business", "enterprise", "team_standard", "team_premium"].includes(
-          tool.planName
-        )
+        ["business", "enterprise", "team"].includes(tool.planName)
       ) {
         let smallerTeamPlan: string | undefined;
         let smallerTeamMessage = "";
 
-        if (tool.toolSlug === "cursor") {
+        if (tool.toolSlug === "cursor" && tool.planName === "business") {
           smallerTeamPlan = "pro";
-          smallerTeamMessage = `Switching from Cursor Teams to Pro saves ${formatInr(getEffectivePlanPrice(SUBSCRIPTION_PRICING.cursor.teams, "monthly") - getEffectivePlanPrice(SUBSCRIPTION_PRICING.cursor.pro, "monthly"))}/seat with no loss of core coding functionality for a team of your size.`;
+          const from = calculateSubscriptionCost(
+            "cursor",
+            "business",
+            billingSeats,
+            tool.quantity,
+            tool.billingCycle
+          );
+          const to = calculateSubscriptionCost(
+            "cursor",
+            "pro",
+            billingSeats,
+            tool.quantity,
+            tool.billingCycle
+          );
+          smallerTeamMessage = `Teams your size seldom need pooled Business governance—moving to Cursor Pro saves ~${formatUsd(from - to)}/mo while keeping coding velocity high.`;
         } else if (tool.toolSlug === "copilot" && tool.planName === "enterprise") {
           smallerTeamPlan = "business";
-          smallerTeamMessage = `Switching from GitHub Copilot Enterprise to Business saves ${formatInr(getEffectivePlanPrice(SUBSCRIPTION_PRICING.copilot.enterprise, "monthly") - getEffectivePlanPrice(SUBSCRIPTION_PRICING.copilot.business, "monthly"))}/seat with no loss of core coding functionality for a team of your size.`;
+          smallerTeamMessage = `Copilot Business covers day-to-day dev AI for tiny teams—Enterprise SSO is rarely worth ~${formatUsd(
+            SUBSCRIPTION_PRICING.copilot.enterprise.priceInUsd -
+              SUBSCRIPTION_PRICING.copilot.business.priceInUsd
+          )}/seat at your headcount unless compliance mandates it.`;
         } else if (tool.toolSlug === "copilot" && tool.planName === "business") {
           smallerTeamPlan = "individual";
-          smallerTeamMessage = `Switching from GitHub Copilot Business to Individual saves ${formatInr(getEffectivePlanPrice(SUBSCRIPTION_PRICING.copilot.business, "monthly") - getEffectivePlanPrice(SUBSCRIPTION_PRICING.copilot.individual, "monthly"))}/seat with no loss of core coding functionality for a team of your size.`;
-        } else if (tool.toolSlug === "claude") {
+          const builders = Math.max(billingSeats, 1);
+          const biz = SUBSCRIPTION_PRICING.copilot.business.priceInUsd * builders;
+          const ind =
+            SUBSCRIPTION_PRICING.copilot.individual.priceInUsd * builders;
+          smallerTeamMessage = `Only keep Copilot Business if you truly need pooled policy controls; Individual licenses (${formatUsd(
+            ind
+          )}/mo) already cover ${builders} builders while Business runs ${formatUsd(
+            biz
+          )}/mo—drop the SKU you are not exploiting.`;
+        } else if (tool.toolSlug === "claude" && tool.planName === "team") {
           smallerTeamPlan = "pro";
-          smallerTeamMessage = `Switching from Claude Team to Pro saves ${formatInr(getEffectivePlanPrice(SUBSCRIPTION_PRICING.claude.team_standard, "monthly") - getEffectivePlanPrice(SUBSCRIPTION_PRICING.claude.pro, "monthly"))}/seat by eliminating unnecessary workspace administration overhead.`;
-        } else if (tool.toolSlug === "chatgpt") {
+          smallerTeamMessage = `Claude Pro already unlocks frontier access for builders; Team admin is redundant for solo/duo pods unless you centrally manage seats/compliance—downshifting trims workspace overhead charges.`;
+        } else if (tool.toolSlug === "chatgpt" && tool.planName === "team") {
           smallerTeamPlan = "plus";
-          smallerTeamMessage = `Switching from ChatGPT Business to Plus saves ${formatInr(getEffectivePlanPrice(SUBSCRIPTION_PRICING.chatgpt.business, "monthly") - getEffectivePlanPrice(SUBSCRIPTION_PRICING.chatgpt.plus, "monthly"))}/seat by removing enterprise controls you do not need yet.`;
+          smallerTeamMessage = `Unless you mandate shared workspaces and analytics, ChatGPT Plus usually ships the models individuals need—Team adds per-seat SaaS markup you may not use yet at this headcount.`;
         }
 
         if (smallerTeamPlan) {
+          const flatQuantity =
+            smallerTeamPlan === "individual" && tool.toolSlug === "copilot"
+              ? billingSeats
+              : tool.quantity;
           const alternativeCost = calculateSubscriptionCost(
             tool.toolSlug,
             smallerTeamPlan,
-            teamSize,
-            teamSize,
+            billingSeats,
+            flatQuantity,
             "monthly"
           );
 
@@ -311,46 +364,32 @@ export async function calculateAudit(
         }
       }
 
-      // ── EXISTING RULE: Enterprise Negotiation ──────────────────────
-      if (["enterprise", "team_premium"].includes(tool.planName)) {
-        const negotiatedCost = roundCurrency(currentCost * 0.8);
-
-        if (negotiatedCost < optimizedCost) {
-          optimizedCost = negotiatedCost;
-          recommendedPlan = `${tool.planName} (Saravanakumar Discount)`;
-          recommendationStr =
-            "Saravanakumar can explicitly negotiate enterprise discounts of around 20% on premium workspace tiers based on volume.";
-        }
-      }
-
-      // ── EXISTING RULE: ChatGPT Pro Catch ───────────────────────────
-      if (tool.toolSlug === "chatgpt" && tool.planName === "pro") {
-        const alternativeCost = calculateSubscriptionCost(
-          "chatgpt",
-          "plus",
+      if (["enterprise"].includes(tool.planName)) {
+        const baselineEnt = calculateSubscriptionCost(
+          tool.toolSlug,
+          tool.planName,
+          billingSeats,
           tool.quantity,
-          teamSize,
-          "monthly"
+          tool.billingCycle
         );
+        const negotiatedCost = roundCurrency(baselineEnt * 0.8);
 
-        if (alternativeCost < optimizedCost) {
-          optimizedCost = alternativeCost;
-          recommendedPlan = "plus";
-          recommendationStr = `Switching from ChatGPT Pro to Plus saves about ${formatInr(
-            currentCost - alternativeCost
-          )} per month per user with minimal impact for mixed use cases.`;
+        if (negotiatedCost < optimizedCost && negotiatedCost < currentCost) {
+          optimizedCost = negotiatedCost;
+          recommendedPlan = `${tool.planName} (negotiated ~20%)`;
+          recommendationStr =
+            "Enterprise ramps often leave 15–25% uplift on rack rates—Saravanakumar benchmarks show comparable stacks closing ~20% off list without losing feature parity when procurement runs ahead of renewal.";
         }
       }
     }
 
     currentCost = roundCurrency(currentCost);
-    optimizedCost = roundCurrency(optimizedCost);
-
+    optimizedCost = roundCurrency(Math.min(optimizedCost, currentCost));
     const monthlySavings = roundCurrency(currentCost - optimizedCost);
     const savingsPercentage =
       currentCost > 0 ? (monthlySavings / currentCost) * 100 : 0;
 
-    toolResults.push({
+    const entry: ToolAuditResult = {
       toolSlug: tool.toolSlug,
       toolName: getToolName(tool.toolSlug),
       currentPlan: tool.planName,
@@ -360,9 +399,14 @@ export async function calculateAudit(
         optimizedCost !== currentCost ? optimizedCost : undefined,
       monthlySavings,
       savingsPercentage,
-      reasoning: recommendationStr || "Your current plan is optimal for this tool.",
+      reasoning:
+        recommendationStr || "Billing already matches benchmarks for this tool.",
       isOverlap: false,
-    });
+      recommendedAction: "Keep existing plan",
+    };
+
+    entry.recommendedAction = buildRecommendedAction(entry);
+    toolResults.push(entry);
 
     totalCurrentMonthlySpend += currentCost;
     totalOptimizedMonthlySpend += optimizedCost;
@@ -375,38 +419,46 @@ export async function calculateAudit(
   const overlaps = detectOverlaps(toolSlugs, toolResults);
   for (const overlap of overlaps) {
     recommendations.push(overlap.recommendation);
-    
-    // Keep the first tool (now the cheapest), suggest cancelling the rest
-    const toolsToCancel = overlap.tools.slice(1);
-    
+
+    const sortedByCost = [...overlap.tools].sort((a, b) => {
+      const costA = toolResults.find((t) => t.toolSlug === a)?.currentMonthlyCost ?? 0;
+      const costB = toolResults.find((t) => t.toolSlug === b)?.currentMonthlyCost ?? 0;
+      return costA - costB;
+    });
+    const keeperSlug = sortedByCost[0];
+    const toolsToCancel = sortedByCost.slice(1);
+    const keeperLabel = keeperSlug ? getToolName(keeperSlug) : "baseline tool";
+
     overlap.tools.forEach((slug) => {
       const toolResult = toolResults.find((result) => result.toolSlug === slug);
-      if (toolResult) {
-        toolResult.isOverlap = true;
-        toolResult.overlapWith = overlap.tools
-          .filter((overlapSlug) => overlapSlug !== slug)
-          .join(", ");
-          
-        if (toolsToCancel.includes(slug)) {
-          const previousOptimized = toolResult.recommendedMonthlyCost ?? toolResult.currentMonthlyCost;
-          
-          toolResult.recommendedPlan = "Cancel / Consolidate";
-          toolResult.recommendedMonthlyCost = 0;
-          toolResult.monthlySavings = toolResult.currentMonthlyCost;
-          toolResult.savingsPercentage = 100;
-          toolResult.reasoning = `Consolidate AI tools. You can cancel this to save ${formatInr(toolResult.currentMonthlyCost)}/mo.`;
-          
-          totalOptimizedMonthlySpend -= previousOptimized;
-        }
-      }
+      if (!toolResult) return;
+
+      toolResult.isOverlap = true;
+      toolResult.overlapWith = overlap.tools.filter((x) => x !== slug).join(", ");
+
+      if (!toolsToCancel.includes(slug)) return;
+
+      const previousOptimized =
+        toolResult.recommendedMonthlyCost ?? toolResult.currentMonthlyCost;
+
+      toolResult.recommendedPlan = "Cancel / Consolidate";
+      toolResult.recommendedMonthlyCost = 0;
+      toolResult.monthlySavings = toolResult.currentMonthlyCost;
+      toolResult.savingsPercentage = 100;
+      toolResult.reasoning = `Overlapping capability with ${keeperLabel} — terminate this duplicate to claw back ${formatUsd(
+        toolResult.currentMonthlyCost
+      )}/mo without sacrificing coverage.`;
+
+      totalOptimizedMonthlySpend -= previousOptimized;
+      toolResult.recommendedAction =
+        buildRecommendedAction(toolResult) ?? toolResult.recommendedAction;
     });
   }
 
-  // ── NEW: Cross-category recommendations ───────────────────────────
   detectCrossCategory(toolResults, recommendations);
 
-  totalCurrentMonthlySpend = roundCurrency(totalCurrentMonthlySpend);
   totalOptimizedMonthlySpend = roundCurrency(totalOptimizedMonthlySpend);
+  totalCurrentMonthlySpend = roundCurrency(totalCurrentMonthlySpend);
 
   const totalMonthlySavings = roundCurrency(
     totalCurrentMonthlySpend - totalOptimizedMonthlySpend
@@ -418,7 +470,7 @@ export async function calculateAudit(
       : 0;
 
   return {
-    currency: "INR",
+    currency: "USD",
     pricingReferenceDate: PRICING_REFERENCE_DATE,
     totalCurrentMonthlySpend,
     totalOptimizedMonthlySpend,
@@ -431,12 +483,9 @@ export async function calculateAudit(
   };
 }
 
-// ── NEW: Cross-category alternatives mapping ────────────────────────
-// IDE tools that include built-in AI chat, making standalone chatbot
-// subscriptions potentially redundant.
 const IDE_WITH_BUILTIN_CHAT: Record<string, string> = {
-  cursor: "Cursor includes Claude Sonnet via Auto mode",
-  copilot: "Copilot includes GPT-5 via chat panel",
+  cursor: "Cursor already routes frontier models inline",
+  copilot: "GitHub Copilot chat ships frontier models beside the IDE",
 };
 
 function detectCrossCategory(
@@ -444,7 +493,7 @@ function detectCrossCategory(
   recommendations: string[]
 ): void {
   const ideSlugs = toolResults
-    .filter((t) => ["cursor", "copilot", "windsurf"].includes(t.toolSlug))
+    .filter((t) => ["cursor", "copilot"].includes(t.toolSlug))
     .map((t) => t.toolSlug);
   const chatbotSlugs = toolResults
     .filter((t) => ["claude", "chatgpt"].includes(t.toolSlug))
@@ -456,15 +505,14 @@ function detectCrossCategory(
 
     for (const chatbot of chatbotSlugs) {
       const chatResult = toolResults.find((t) => t.toolSlug === chatbot);
-      if (!chatResult || chatResult.recommendedPlan === "Cancel / Consolidate") continue;
+      if (!chatResult || chatResult.recommendedPlan === "Cancel / Consolidate")
+        continue;
 
-      // Only flag individual chatbot plans (Pro/Plus), not Team/Business plans
-      // which provide additional workspace features
       const individualPlans = ["pro", "plus"];
       if (individualPlans.includes(chatResult.currentPlan)) {
-        chatResult.crossCategoryNote = `💡 ${builtIn} — you may not need a separate ${chatResult.toolName} subscription if you primarily use it for coding assistance.`;
+        chatResult.crossCategoryNote = `${builtIn}—if ${chatResult.toolName} is only powering coding QA, consolidate into the IDE tier you already finance.`;
         recommendations.push(
-          `Consider whether your ${getToolName(ide)} subscription already covers your ${chatResult.toolName} use case. ${builtIn}.`
+          `Check whether ${getToolName(ide)} satisfies the ${chatResult.toolName} use case before renewing both.`,
         );
       }
     }
@@ -477,25 +525,28 @@ export function detectOverlaps(
 ): Array<{ tools: string[]; category: string; recommendation: string }> {
   const overlaps = [];
 
-  const ides = ["cursor", "copilot", "windsurf"].filter((toolSlug) =>
+  const ides = ["cursor", "copilot"].filter((toolSlug) =>
     toolSlugs.includes(toolSlug)
   );
   if (ides.length > 1) {
-    // ── IMPROVED: Smart overlap — keep the cheaper tool ──────────
     let sortedIdes = ides;
     if (toolResults) {
       sortedIdes = [...ides].sort((a, b) => {
-        const costA = toolResults.find((t) => t.toolSlug === a)?.currentMonthlyCost ?? 0;
-        const costB = toolResults.find((t) => t.toolSlug === b)?.currentMonthlyCost ?? 0;
-        return costA - costB; // cheapest first (will be kept)
+        const costA =
+          toolResults.find((t) => t.toolSlug === a)?.currentMonthlyCost ?? 0;
+        const costB =
+          toolResults.find((t) => t.toolSlug === b)?.currentMonthlyCost ?? 0;
+        return costA - costB;
       });
     }
     overlaps.push({
       tools: sortedIdes,
       category: "ide",
-      recommendation: `You are paying for multiple IDE assistants (${sortedIdes.join(
-        " and "
-      )}). Standardizing on ${getToolName(sortedIdes[0])} (cheapest) can eliminate redundant spending.`,
+      recommendation: `You pay for overlapping IDE assistants (${sortedIdes
+        .map((s) => getToolName(s))
+        .join(" + ")}). Standardizing on ${getToolName(
+        sortedIdes[0]!
+      )} removes duplicate per-seat SaaS.`,
     });
   }
 
@@ -506,17 +557,21 @@ export function detectOverlaps(
     let sortedChatbots = chatbots;
     if (toolResults) {
       sortedChatbots = [...chatbots].sort((a, b) => {
-        const costA = toolResults.find((t) => t.toolSlug === a)?.currentMonthlyCost ?? 0;
-        const costB = toolResults.find((t) => t.toolSlug === b)?.currentMonthlyCost ?? 0;
+        const costA =
+          toolResults.find((t) => t.toolSlug === a)?.currentMonthlyCost ?? 0;
+        const costB =
+          toolResults.find((t) => t.toolSlug === b)?.currentMonthlyCost ?? 0;
         return costA - costB;
       });
     }
     overlaps.push({
       tools: sortedChatbots,
       category: "chatbot",
-      recommendation: `You are paying for multiple premium chatbots (${sortedChatbots.join(
-        " and "
-      )}). Most teams only need one frontier model interface. Keeping ${getToolName(sortedChatbots[0])} (cheapest).`,
+      recommendation: `Two premium frontier chat SKUs (${sortedChatbots
+        .map((s) => getToolName(s))
+        .join(" + ")}) seldom earn their keep concurrently—keeping ${getToolName(
+        sortedChatbots[0]!
+      )} and cancelling duplicate coverage is lowest risk.`,
     });
   }
 

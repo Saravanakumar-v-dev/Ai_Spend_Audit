@@ -33,7 +33,7 @@ This metric directly ties to revenue: the higher the wasted spend surfaced, the 
 **Why it matters:** This metric reflects the quality of our tool selection UI and engine rules. If it drops below 50%, our tool catalog doesn't match real-world stacks, or our pricing data is stale. It is the clearest signal of engine accuracy.
 
 ### 3. Consultation Booking Rate
-**Definition:** Percentage of savings-positive audits that result in a consultation request (clicking the "Book a Credex Consultation" CTA).  
+**Definition:** Percentage of savings-positive audits that result in a consultation request (clicking the "Book a Saravanakumar Consultation" CTA).  
 **Current Target:** 7.5%  
 **Why it matters:** This is the conversion from product to revenue. It measures whether the report is compelling enough to make a founder take the next step. If savings are surfaced but nobody books, the problem is trust or CTA design, not the engine.
 
@@ -50,7 +50,7 @@ These are the exact PostHog events we track from day 1:
 | `audit_form_abandoned` | User leaves page with incomplete form | `last_step`, `time_on_form_seconds` |
 | `audit_completed` | Form submitted successfully, audit generated | `tools_count`, `team_size`, `total_savings_inr` |
 | `audit_report_viewed` | User lands on `/audit/[id]` page | `savings_bracket` (zero / low / medium / high) |
-| `consultation_cta_clicked` | User clicks "Book a Credex Consultation" | `total_savings_inr`, `tools_count` |
+| `consultation_cta_clicked` | User clicks "Book a Saravanakumar Consultation" | `total_savings_inr`, `tools_count` |
 | `share_report_clicked` | User clicks "Share Report" link | `destination` (copy_link / linkedin / twitter) |
 | `honesty_filter_shown` | Report shows "You're spending well" (no savings) | `tools_count`, `total_spend_inr` |
 

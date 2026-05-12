@@ -48,7 +48,7 @@ Their mental state is **confusion + mild guilt**, not active cost-cutting. They 
 | 3 | Write a data-driven blog post: "We Audited 50 AI Stacks — The Average Indian Startup Wastes Rs 18,000/mo." Post to Hacker News, r/startups, r/ExperiencedDevs. | 200 visitors, 35 completed audits |
 | 4 | Email every user who completed an audit with a follow-up: "Your audit surfaced Rs X in savings — want a 15-minute call to walk through the recommendations?" | 15 consultation requests from 80 total audits |
 
-**30-day target:** 100 completed audits, 15 consultation requests, 3 signed Credex engagements.
+**30-day target:** 100 completed audits, 15 consultation requests, 3 signed Saravanakumar engagements.
 
 ---
 
@@ -56,7 +56,7 @@ Their mental state is **confusion + mild guilt**, not active cost-cutting. They 
 
 Most AI tool spend at startups is **fragmented across 3–5 credit cards and personal accounts**. The CTO pays for Cursor. Two engineers expense Claude Pro. The API key is on the founder's Stripe. Nobody has a single view.
 
-Credex's positioning is unique: **we are the only firm that audits fragmented AI spend across the entire engineering stack, not just one vendor.** AWS cost optimization tools (like Vantage or CloudHealth) don't touch SaaS AI subscriptions. Brex and Ramp categorize them as generic "software." Our tool is the only one that understands that paying for both Cursor Teams ($40/seat) and Copilot Enterprise ($39/seat) simultaneously is a Rs 3,774/seat/mo redundancy.
+Saravanakumar's positioning is unique: **we are the only firm that audits fragmented AI spend across the entire engineering stack, not just one vendor.** AWS cost optimization tools (like Vantage or CloudHealth) don't touch SaaS AI subscriptions. Brex and Ramp categorize them as generic "software." Our tool is the only one that understands that paying for both Cursor Teams ($40/seat) and Copilot Enterprise ($39/seat) simultaneously is a Rs 3,774/seat/mo redundancy.
 
 This "Shadow Bill" framing — *"Your AI bill is bigger than you think, because it's hiding in 5 places"* — is the wedge message for every outbound DM, Slack post, and cold email.
 

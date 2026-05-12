@@ -2,52 +2,72 @@
  * AuditForm — Client Component
  *
  * Multi-step form for collecting AI tool usage data.
- * Validates input on the client with Zod, then submits to POST /api/leads.
- *
- * Persists form data to localStorage so progress survives page reloads.
+ * Persists to localStorage (fields + wizard step) across reloads.
  */
 
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { AuditFormData } from "@/lib/validators";
+import type { AuditFormData, ToolSelection } from "@/lib/validators";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { AUDIT_TOOL_CHOICES } from "@/data/audit-tools";
+import type { AuditToolChoice } from "@/data/audit-tools";
+import { formatUsd } from "@/lib/format-usd";
+import { HONEYPOT_FIELD_NAME } from "@/lib/honeypot";
 
 export default function AuditForm() {
   const router = useRouter();
-  const [step, setStep] = useState(1);
   const totalSteps = 3;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Use custom hook for form persistence
-  const [formData, setFormData, isHydrated] = useLocalStorage<AuditFormData>(
+  const [formData, setFormData, formHydrated] = useLocalStorage<AuditFormData>(
     "auditFormData",
     {
       companyName: "",
       role: "",
       teamSize: 1,
       email: "",
+      primaryUseCase: "mixed",
       tools: [],
     }
   );
 
-  // Honeypot field state for basic bot validation
+  const [step, setStep, stepHydrated] = useLocalStorage<number>(
+    "auditFormStep",
+    1
+  );
+
   const [honeypot, setHoneypot] = useState("");
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const hydrated = formHydrated && stepHydrated;
+
+  const normalizedStep = Math.min(Math.max(step, 1), totalSteps);
+
+  const auditToolLookup = useMemo(() => {
+    const map = new Map<string, AuditToolChoice>();
+    AUDIT_TOOL_CHOICES.forEach((t) => map.set(t.slug, t));
+    return map;
+  }, []);
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { id, value, type } = e.target;
-    
-    // Map HTML IDs back to state properties
     let key = id;
     if (id === "company-name") key = "companyName";
     if (id === "team-size") key = "teamSize";
+    if (id === "primary-use-case") key = "primaryUseCase";
 
     setFormData((prev) => ({
       ...prev,
       [key]:
-        type === "number" ? (value === "" ? undefined : Number(value)) : value,
+        type === "number"
+          ? value === ""
+            ? undefined
+            : Number(value)
+          : value,
     }));
   };
 
@@ -55,24 +75,25 @@ export default function AuditForm() {
     setHoneypot(e.target.value);
   };
 
-  const addTool = (
-    toolSlug: string,
-    planName: string,
-    quantity: number,
-    estimatedMonthlyTokens?: { inputTokens: number; outputTokens: number },
-    billingCycle: "monthly" | "annual" = "monthly",
-    activeUsers?: number
-  ) => {
+  const addTool = (choice: AuditToolChoice, planName: string) => {
+    const option = choice.options.find((o) => o.planName === planName);
+    if (!option) return;
+    const team = formData.teamSize || 1;
+    const qty = option.perSeat ? team : 1;
+    const newTool: ToolSelection = {
+      toolSlug: choice.slug,
+      planName,
+      quantity: qty,
+      billingCycle: "monthly",
+      seatCount: option.perSeat ? qty : undefined,
+      estimatedMonthlyTokens: choice.slug.startsWith("api_")
+        ? { inputTokens: 10_000_000, outputTokens: 2_000_000 }
+        : undefined,
+    };
+
     setFormData((prev) => {
-      // Avoid duplicates for MVP
-      if (prev.tools.find((t) => t.toolSlug === toolSlug)) return prev;
-      return {
-        ...prev,
-        tools: [
-          ...prev.tools,
-          { toolSlug, planName, quantity, billingCycle, estimatedMonthlyTokens, activeUsers },
-        ],
-      };
+      if (prev.tools.find((t) => t.toolSlug === choice.slug)) return prev;
+      return { ...prev, tools: [...prev.tools, newTool] };
     });
   };
 
@@ -83,13 +104,30 @@ export default function AuditForm() {
     }));
   };
 
+  const updateTool = (
+    slug: string,
+    patch: Partial<ToolSelection>
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      tools: prev.tools.map((t) =>
+        t.toolSlug === slug ? { ...t, ...patch } : t
+      ),
+    }));
+  };
+
+  const goStep = (next: number) => {
+    const clamped = Math.min(Math.max(next, 1), totalSteps);
+    setStep(clamped);
+  };
+
   const handleSubmit = async () => {
     setIsSubmitting(true);
     setError(null);
     try {
       const payload = {
         ...formData,
-        website_url: honeypot, // The honeypot field
+        [HONEYPOT_FIELD_NAME]: honeypot,
       };
 
       const res = await fetch("/api/leads", {
@@ -104,10 +142,8 @@ export default function AuditForm() {
         throw new Error(data.error || "Failed to generate audit");
       }
 
-      // Clear local storage on success
       localStorage.removeItem("auditFormData");
-      
-      // Redirect to the dynamic audit result page
+      localStorage.removeItem("auditFormStep");
       router.push(`/audit/${data.auditId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate audit");
@@ -115,32 +151,35 @@ export default function AuditForm() {
     }
   };
 
-  // Prevent flash of empty content during SSR hydration
-  if (!isHydrated) {
+  if (!hydrated) {
     return <div className="glass rounded-2xl p-8 h-[400px] animate-pulse" />;
   }
 
   return (
-    <div className="glass-elevated rounded-2xl p-8 animate-slide-up shadow-2xl border border-accent-primary/20" id="audit-form">
-      {/* Step Progress Indicator */}
+    <div
+      className="glass-elevated rounded-2xl p-8 animate-slide-up shadow-2xl border border-accent-primary/20"
+      id="audit-form"
+    >
       <div className="mb-8 flex items-center justify-center gap-3">
         {Array.from({ length: totalSteps }, (_, i) => (
           <div key={i} className="flex items-center gap-3">
             <div
               className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold transition-all duration-500 ${
-                i + 1 <= step
+                i + 1 <= normalizedStep
                   ? "bg-gradient-to-br from-accent-primary to-accent-secondary text-white shadow-lg shadow-accent-glow scale-110 font-poppins"
-                  : i + 1 === step + 1 
-                  ? "bg-surface-elevated text-accent-primary border-2 border-accent-primary/40 font-poppins"
-                  : "bg-surface text-foreground/40 font-poppins"
+                  : i + 1 === normalizedStep + 1
+                    ? "bg-surface-elevated text-accent-primary border-2 border-accent-primary/40 font-poppins"
+                    : "bg-surface text-foreground/40 font-poppins"
               }`}
             >
-              {i + 1 <= step ? "✓" : i + 1}
+              {i + 1 <= normalizedStep ? "✓" : i + 1}
             </div>
             {i < totalSteps - 1 && (
               <div
                 className={`h-1 w-12 rounded-full transition-all duration-500 ${
-                  i + 1 < step ? "bg-gradient-to-r from-accent-primary to-accent-secondary shadow-md shadow-accent-glow" : "bg-border"
+                  i + 1 < normalizedStep
+                    ? "bg-gradient-to-r from-accent-primary to-accent-secondary shadow-md shadow-accent-glow"
+                    : "bg-border"
                 }`}
               />
             )}
@@ -148,31 +187,42 @@ export default function AuditForm() {
         ))}
       </div>
 
-      {/* Step Labels */}
       <div className="mb-8 text-center animate-fade-in">
         <h3 className="text-2xl font-bold text-foreground font-display">
-          {step === 1 && "👥 About Your Team"}
-          {step === 2 && "🔧 Your AI Tools"}
-          {step === 3 && "✨ Review & Submit"}
+          {normalizedStep === 1 && "👥 Team & mission"}
+          {normalizedStep === 2 && "🔧 AI stack (USD-native)"}
+          {normalizedStep === 3 && "✨ Review & generate"}
         </h3>
         <p className="mt-2 text-sm text-foreground/60 font-inter">
-          {step === 1 && "Tell us about your startup and team size"}
-          {step === 2 && "Select the AI tools your team currently uses"}
-          {step === 3 && "Review your selections and get your personalized audit"}
+          {normalizedStep === 1 &&
+            "We size seats and savings using your real headcount + use case."}
+          {normalizedStep === 2 &&
+            "Every label lists US list pricing as of May 2026 — override with your invoice if needed."}
+          {normalizedStep === 3 &&
+            "We never fabricate savings; everything is benchmark-driven."}
         </p>
       </div>
 
       {error && (
         <div className="mb-6 p-4 rounded-xl bg-danger/10 border border-danger/30 text-danger text-sm font-medium flex items-start gap-3 animate-bounce-in">
-          <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-          </svg>
           <span>{error}</span>
         </div>
       )}
 
-      {/* Step 1: Company Info */}
-      {step === 1 && (
+      <div className="absolute left-[-9999px] top-[-9999px]" aria-hidden="true">
+        <label htmlFor={HONEYPOT_FIELD_NAME}>Website</label>
+        <input
+          type="text"
+          id={HONEYPOT_FIELD_NAME}
+          name={HONEYPOT_FIELD_NAME}
+          tabIndex={-1}
+          autoComplete="off"
+          value={honeypot}
+          onChange={handleHoneypotChange}
+        />
+      </div>
+
+      {normalizedStep === 1 && (
         <div className="space-y-5 animate-fade-in">
           <div className="group">
             <label
@@ -181,20 +231,15 @@ export default function AuditForm() {
             >
               Work Email <span className="text-danger font-bold">*</span>
             </label>
-            <div className="relative">
-              <input
-                id="email"
-                type="email"
-                required
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="you@startup.com"
-                className="w-full rounded-xl border border-border/50 bg-surface/50 px-4 py-3 text-foreground placeholder:text-foreground/30 focus:border-accent-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/30 transition-all duration-300 hover:border-border backdrop-blur-sm font-inter"
-              />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/30 group-hover:text-accent-primary transition-colors">
-                📧
-              </div>
-            </div>
+            <input
+              id="email"
+              type="email"
+              required
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="you@startup.com"
+              className="w-full rounded-xl border border-border/50 bg-surface/50 px-4 py-3 text-foreground placeholder:text-foreground/30 focus:border-accent-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/30 transition-all duration-300 font-inter"
+            />
           </div>
 
           <div className="group">
@@ -202,22 +247,19 @@ export default function AuditForm() {
               htmlFor="company-name"
               className="block text-sm font-semibold text-foreground/80 mb-2 font-poppins"
             >
-              Company Name
-              <span className="text-foreground/40 text-xs font-normal ml-1">(Optional)</span>
+              Company{" "}
+              <span className="text-foreground/40 text-xs font-normal">
+                (optional)
+              </span>
             </label>
-            <div className="relative">
-              <input
-                id="company-name"
-                type="text"
-                value={formData.companyName || ""}
-                onChange={handleChange}
-                placeholder="Acme Corp"
-                className="w-full rounded-xl border border-border/50 bg-surface/50 px-4 py-3 text-foreground placeholder:text-foreground/30 focus:border-accent-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/30 transition-all duration-300 hover:border-border backdrop-blur-sm font-inter"
-              />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/30 group-hover:text-accent-primary transition-colors">
-                🏢
-              </div>
-            </div>
+            <input
+              id="company-name"
+              type="text"
+              value={formData.companyName || ""}
+              onChange={handleChange}
+              placeholder="Acme Corp"
+              className="w-full rounded-xl border border-border/50 bg-surface/50 px-4 py-3 text-foreground placeholder:text-foreground/30 focus:border-accent-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/30 transition-all duration-300 font-inter"
+            />
           </div>
 
           <div className="group">
@@ -225,22 +267,19 @@ export default function AuditForm() {
               htmlFor="role"
               className="block text-sm font-semibold text-foreground/80 mb-2 font-poppins"
             >
-              Your Role
-              <span className="text-foreground/40 text-xs font-normal ml-1">(Optional)</span>
+              Role{" "}
+              <span className="text-foreground/40 text-xs font-normal">
+                (optional)
+              </span>
             </label>
-            <div className="relative">
-              <input
-                id="role"
-                type="text"
-                value={formData.role || ""}
-                onChange={handleChange}
-                placeholder="CTO, Founder, Tech Lead..."
-                className="w-full rounded-xl border border-border/50 bg-surface/50 px-4 py-3 text-foreground placeholder:text-foreground/30 focus:border-accent-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/30 transition-all duration-300 hover:border-border backdrop-blur-sm font-inter"
-              />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/30 group-hover:text-accent-primary transition-colors">
-                👔
-              </div>
-            </div>
+            <input
+              id="role"
+              type="text"
+              value={formData.role || ""}
+              onChange={handleChange}
+              placeholder="CTO, Staff Engineer…"
+              className="w-full rounded-xl border border-border/50 bg-surface/50 px-4 py-3 text-foreground placeholder:text-foreground/30 focus:border-accent-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/30 transition-all duration-300 font-inter"
+            />
           </div>
 
           <div className="group">
@@ -248,235 +287,436 @@ export default function AuditForm() {
               htmlFor="team-size"
               className="block text-sm font-semibold text-foreground/80 mb-2 font-poppins"
             >
-              Engineering Team Size
-              <span className="text-foreground/40 text-xs font-normal ml-1">(Optional)</span>
+              Engineering team size{" "}
+              <span className="text-foreground/40 text-xs font-normal">
+                (seats)
+              </span>
             </label>
-            <div className="relative">
-              <input
-                id="team-size"
-                type="number"
-                min={1}
-                value={formData.teamSize || ""}
-                onChange={handleChange}
-                placeholder="e.g., 12"
-                className="w-full rounded-xl border border-border/50 bg-surface/50 px-4 py-3 text-foreground placeholder:text-foreground/30 focus:border-accent-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/30 transition-all duration-300 hover:border-border backdrop-blur-sm font-inter"
-              />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/30 group-hover:text-accent-primary transition-colors">
-                👥
-              </div>
-            </div>
-          </div>
-          
-          {/* Honeypot field - visually hidden to catch bots */}
-          <div className="absolute left-[-9999px] top-[-9999px]" aria-hidden="true">
-            <label htmlFor="website_url">Do not fill this out if you are human</label>
             <input
-              type="text"
-              id="website_url"
-              name="website_url"
-              tabIndex={-1}
-              autoComplete="off"
-              value={honeypot}
-              onChange={handleHoneypotChange}
+              id="team-size"
+              type="number"
+              min={1}
+              value={formData.teamSize ?? ""}
+              onChange={handleChange}
+              placeholder="12"
+              className="w-full rounded-xl border border-border/50 bg-surface/50 px-4 py-3 text-foreground placeholder:text-foreground/30 focus:border-accent-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/30 transition-all duration-300 font-inter"
             />
           </div>
-        </div>
-      )}
 
-      {/* Step 2: Tool Selection */}
-      {step === 2 && (
-        <div className="animate-fade-in space-y-3 max-h-[450px] overflow-y-auto pr-2 custom-scrollbar">
-          <p className="text-sm text-foreground/70 mb-6 font-inter font-medium sticky top-0 bg-surface/50 backdrop-blur-sm p-3 rounded-lg">
-            ✨ Select the tools your team currently uses
-          </p>
-          
-          {[
-            { slug: "cursor", name: "Cursor", icon: "💻", options: [{ name: "Pro", price: "Rs 1,887", slug: "pro", quantity: 1 }, { name: "Teams", price: "Rs 3,775/user", slug: "teams", quantity: formData.teamSize || 1 }] },
-            { slug: "copilot", name: "GitHub Copilot", icon: "🐙", options: [{ name: "Individual", price: "Rs 944", slug: "individual", quantity: 1 }, { name: "Business", price: "Rs 1,793/user", slug: "business", quantity: formData.teamSize || 1 }, { name: "Enterprise", price: "Rs 3,680/user", slug: "enterprise", quantity: formData.teamSize || 1 }] },
-            { slug: "claude", name: "Claude", icon: "🤖", options: [{ name: "Pro", price: "Rs 1,887", slug: "pro", quantity: 1 }, { name: "Team", price: "Rs 2,831/user", slug: "team_standard", quantity: formData.teamSize || 1 }] },
-            { slug: "chatgpt", name: "ChatGPT", icon: "💬", options: [{ name: "Plus", price: "Rs 1,887", slug: "plus", quantity: 1 }, { name: "Business", price: "Rs 1,800/user/year", slug: "business", quantity: formData.teamSize || 1 }, { name: "Pro", price: "Rs 18,874", slug: "pro", quantity: 1 }] },
-            { slug: "api_anthropic_sonnet", name: "Anthropic API", icon: "🔗", options: [{ name: "Moderate Usage", price: "~Rs 5,662/mo", slug: "api_usage", quantity: 1 }] },
-            { slug: "api_openai_gpt5_4", name: "OpenAI API", icon: "🔌", options: [{ name: "Moderate Usage", price: "~Rs 5,190/mo", slug: "api_usage", quantity: 1 }] },
-          ].map((tool, idx) => (
-            <div
-              key={tool.slug}
-              className="p-4 rounded-xl border border-border/40 bg-surface/30 backdrop-blur-sm transition-all duration-300 hover:border-accent-primary/40 hover:bg-surface/50 group stagger-children"
-              style={{animationDelay: `${idx * 0.05}s`}}
+          <div className="group">
+            <label
+              htmlFor="primary-use-case"
+              className="block text-sm font-semibold text-foreground/80 mb-2 font-poppins"
             >
-              <div className="flex justify-between items-center mb-3">
-                <h4 className="font-semibold text-foreground flex items-center gap-2 font-poppins">
-                  <span className="text-xl group-hover:scale-125 transition-transform">{tool.icon}</span>
-                  {tool.name}
-                </h4>
-              </div>
-              {!formData.tools.find(t => t.toolSlug === tool.slug) ? (
-                <div className="flex flex-wrap gap-2">
-                  {tool.options.map((opt) => (
-                    <button 
-                      key={opt.slug}
-                      onClick={() => addTool(tool.slug, opt.slug, opt.quantity)}
-                      className="px-3 py-2 text-xs font-semibold rounded-lg bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20 border border-accent-primary/20 hover:border-accent-primary/40 transition-all duration-300 hover:shadow-md hover:shadow-accent-glow/50 hover:-translate-y-0.5 font-inter"
-                    >
-                      + {opt.name}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-success font-semibold flex items-center gap-2 font-poppins">
-                      ✓ Added: {formData.tools.find(t => t.toolSlug === tool.slug)?.planName?.replace("_", " ")}
-                    </span>
-                    <button 
-                      onClick={() => removeTool(tool.slug)} 
-                      className="text-danger/80 hover:text-danger font-semibold transition-colors font-poppins"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                  
-                  {/* Billing Cycle Toggle — for subscription tools */}
-                  {!tool.slug.startsWith("api_") && (
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-foreground/50 font-inter">Billing:</span>
-                      <div className="flex rounded-lg border border-border/40 overflow-hidden">
-                        {(["monthly", "annual"] as const).map((cycle) => (
-                          <button
-                            key={cycle}
-                            onClick={() => {
-                              setFormData((prev) => ({
-                                ...prev,
-                                tools: prev.tools.map((t) =>
-                                  t.toolSlug === tool.slug ? { ...t, billingCycle: cycle } : t
-                                ),
-                              }));
-                            }}
-                            className={`px-3 py-1.5 text-xs font-medium transition-all ${
-                              (formData.tools.find(t => t.toolSlug === tool.slug)?.billingCycle || "monthly") === cycle
-                                ? "bg-accent-primary/20 text-accent-primary"
-                                : "text-foreground/40 hover:text-foreground/60"
-                            }`}
-                          >
-                            {cycle === "monthly" ? "Monthly" : "Annual"}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Active Users Input — for per-seat plans */}
-                  {tool.options.find(o => o.slug === formData.tools.find(t => t.toolSlug === tool.slug)?.planName)?.quantity !== 1 && (
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-foreground/50 font-inter whitespace-nowrap">Active users:</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={formData.teamSize || 9999}
-                        placeholder={`${formData.teamSize || "All"}`}
-                        value={formData.tools.find(t => t.toolSlug === tool.slug)?.activeUsers ?? ""}
-                        onChange={(e) => {
-                          const val = e.target.value === "" ? undefined : Number(e.target.value);
-                          setFormData((prev) => ({
-                            ...prev,
-                            tools: prev.tools.map((t) =>
-                              t.toolSlug === tool.slug ? { ...t, activeUsers: val } : t
-                            ),
-                          }));
-                        }}
-                        className="w-20 rounded-lg border border-border/40 bg-surface/50 px-3 py-1.5 text-xs text-foreground placeholder:text-foreground/30 focus:border-accent-primary focus:outline-none focus:ring-1 focus:ring-accent-primary/30 font-inter"
-                      />
-                      <span className="text-xs text-foreground/40 font-inter">
-                        of {formData.teamSize || "?"} total
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
+              Primary use case
+            </label>
+            <select
+              id="primary-use-case"
+              value={formData.primaryUseCase ?? "mixed"}
+              onChange={handleChange}
+              className="w-full rounded-xl border border-border/50 bg-surface/50 px-4 py-3 text-foreground focus:border-accent-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/30 transition-all duration-300 font-inter"
+            >
+              <option value="coding">Coding / shipping software</option>
+              <option value="writing">Writing / GTM</option>
+              <option value="data">Data / analytics</option>
+              <option value="research">Research / strategy</option>
+              <option value="mixed">Mixed workflows</option>
+            </select>
+          </div>
         </div>
       )}
 
-      {/* Step 3: Review */}
-      {step === 3 && (
+      {normalizedStep === 2 && (
+        <div className="animate-fade-in space-y-3 max-h-[520px] overflow-y-auto pr-2 custom-scrollbar">
+          <p className="text-sm text-foreground/70 mb-4 font-inter font-medium sticky top-0 bg-surface/60 backdrop-blur-sm p-3 rounded-xl border border-border/40">
+            Minimum coverage for submission week benchmarks: Cursor, Copilot,
+            Claude, ChatGPT, Anthropic & OpenAI APIs, Gemini (subscription +
+            API), plus v0. Reference rates stay in USD to avoid FX confusion on
+            screenshots.
+          </p>
+
+          {AUDIT_TOOL_CHOICES.map((tool, idx) => {
+            const active = formData.tools.find((t) => t.toolSlug === tool.slug);
+            const isApi = tool.slug.startsWith("api_");
+
+            return (
+              <div
+                key={tool.slug}
+                className="p-4 rounded-xl border border-border/40 bg-surface/30 backdrop-blur-sm transition-all duration-300 hover:border-accent-primary/40 hover:bg-surface/50 group"
+                style={{ animationDelay: `${idx * 0.03}s` }}
+              >
+                <div className="flex justify-between items-start mb-3 gap-3">
+                  <div>
+                    <h4 className="font-semibold text-foreground flex items-center gap-2 font-poppins text-base">
+                      <span className="text-xl">{tool.icon}</span>
+                      {tool.name}
+                    </h4>
+                    <p className="text-xs text-foreground/50 mt-1 font-inter leading-relaxed">
+                      {tool.headline}
+                    </p>
+                  </div>
+                </div>
+                {!active ? (
+                  <div className="flex flex-col gap-3">
+                    {tool.modelRatesNote && (
+                      <p className="text-[11px] text-foreground/45 font-mono leading-snug border border-border/40 rounded-lg px-3 py-2 bg-background/40">
+                        {tool.modelRatesNote}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {tool.options.map((opt) => (
+                        <button
+                          key={opt.planName}
+                          type="button"
+                          onClick={() => addTool(tool, opt.planName)}
+                          className="px-3 py-2 text-xs font-semibold rounded-lg bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20 border border-accent-primary/20 hover:border-accent-primary/40 transition-all duration-300 font-inter text-left"
+                        >
+                          + {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center text-sm gap-2">
+                      <span className="text-success font-semibold font-poppins">
+                        ✓ {active.planName.replaceAll("_", " ")}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeTool(tool.slug)}
+                        className="text-danger/80 hover:text-danger font-semibold transition-colors font-poppins"
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    {!isApi && (
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="text-xs text-foreground/50 font-inter">
+                          Billing
+                        </span>
+                        <div className="flex rounded-lg border border-border/40 overflow-hidden">
+                          {(["monthly", "annual"] as const).map((cycle) => (
+                            <button
+                              key={cycle}
+                              type="button"
+                              onClick={() =>
+                                updateTool(tool.slug, { billingCycle: cycle })
+                              }
+                              className={`px-3 py-1.5 text-xs font-medium transition-all ${
+                                (active.billingCycle || "monthly") === cycle
+                                  ? "bg-accent-primary/20 text-accent-primary"
+                                  : "text-foreground/40 hover:text-foreground/60"
+                              }`}
+                            >
+                              {cycle === "monthly" ? "Monthly" : "Annual"}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {!isApi ? (
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[11px] uppercase tracking-wide text-foreground/40 font-semibold">
+                            Billed seats / licenses
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={active.seatCount ?? active.quantity}
+                            onChange={(e) => {
+                              const val = Number(e.target.value) || 1;
+                              updateTool(tool.slug, {
+                                seatCount: val,
+                                quantity: val,
+                              });
+                            }}
+                            className="mt-1 w-full rounded-lg border border-border/40 bg-surface/50 px-3 py-2 text-sm text-foreground focus:border-accent-primary focus:outline-none font-inter"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] uppercase tracking-wide text-foreground/40 font-semibold">
+                            Invoice (USD / mo, optional)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            placeholder="Overrides list-price math"
+                            value={active.reportedMonthlySpendUsd ?? ""}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              updateTool(tool.slug, {
+                                reportedMonthlySpendUsd:
+                                  raw === "" ? undefined : Number(raw),
+                              });
+                            }}
+                            className="mt-1 w-full rounded-lg border border-border/40 bg-surface/50 px-3 py-2 text-sm text-foreground focus:border-accent-primary focus:outline-none font-inter"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="text-[11px] uppercase tracking-wide text-foreground/40 font-semibold">
+                          Cloud invoice (USD / mo, optional)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          placeholder="Paste last month's API bill"
+                          value={active.reportedMonthlySpendUsd ?? ""}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            updateTool(tool.slug, {
+                              reportedMonthlySpendUsd:
+                                raw === "" ? undefined : Number(raw),
+                            });
+                          }}
+                          className="mt-1 w-full rounded-lg border border-border/40 bg-surface/50 px-3 py-2 text-sm text-foreground focus:border-accent-primary focus:outline-none font-inter"
+                        />
+                      </div>
+                    )}
+
+                    {auditToolLookup
+                      .get(tool.slug)
+                      ?.options.find((o) => o.planName === active.planName)
+                      ?.perSeat && (
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="text-xs text-foreground/50 font-inter whitespace-nowrap">
+                          Active users (optional)
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={active.seatCount ?? active.quantity}
+                          placeholder="Seats in use"
+                          value={active.activeUsers ?? ""}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            updateTool(tool.slug, {
+                              activeUsers:
+                                raw === "" ? undefined : Number(raw),
+                            });
+                          }}
+                          className="w-28 rounded-lg border border-border/40 bg-surface/50 px-3 py-1.5 text-xs text-foreground focus:border-accent-primary focus:outline-none font-inter"
+                        />
+                        <span className="text-xs text-foreground/40 font-inter">
+                          of {active.seatCount ?? active.quantity} billed
+                        </span>
+                      </div>
+                    )}
+
+                    {isApi && (
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[11px] uppercase tracking-wide text-foreground/40 font-semibold">
+                            Input tokens / mo (millions)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.1}
+                            value={
+                              (active.estimatedMonthlyTokens?.inputTokens ??
+                                0) / 1_000_000
+                            }
+                            onChange={(e) => {
+                              const m = Number(e.target.value);
+                              updateTool(tool.slug, {
+                                estimatedMonthlyTokens: {
+                                  inputTokens: Math.round(m * 1_000_000),
+                                  outputTokens:
+                                    active.estimatedMonthlyTokens
+                                      ?.outputTokens ?? 2_000_000,
+                                },
+                              });
+                            }}
+                            className="mt-1 w-full rounded-lg border border-border/40 bg-surface/50 px-3 py-2 text-sm text-foreground focus:border-accent-primary focus:outline-none font-inter"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] uppercase tracking-wide text-foreground/40 font-semibold">
+                            Output tokens / mo (millions)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.1}
+                            value={
+                              (active.estimatedMonthlyTokens?.outputTokens ??
+                                0) / 1_000_000
+                            }
+                            onChange={(e) => {
+                              const m = Number(e.target.value);
+                              updateTool(tool.slug, {
+                                estimatedMonthlyTokens: {
+                                  inputTokens:
+                                    active.estimatedMonthlyTokens
+                                      ?.inputTokens ?? 10_000_000,
+                                  outputTokens: Math.round(m * 1_000_000),
+                                },
+                              });
+                            }}
+                            className="mt-1 w-full rounded-lg border border-border/40 bg-surface/50 px-3 py-2 text-sm text-foreground focus:border-accent-primary focus:outline-none font-inter"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {normalizedStep === 3 && (
         <div className="animate-fade-in space-y-5 text-sm">
           <div className="p-5 rounded-xl border border-accent-primary/20 bg-accent-primary/5 backdrop-blur-sm space-y-2">
-            <h4 className="font-bold text-foreground font-poppins mb-3">📋 Your Information</h4>
-            <p className="text-foreground/80"><span className="font-semibold">Email:</span> {formData.email}</p>
-            {formData.companyName && <p className="text-foreground/80"><span className="font-semibold">Company:</span> {formData.companyName}</p>}
-            {formData.role && <p className="text-foreground/80"><span className="font-semibold">Role:</span> {formData.role}</p>}
-            {formData.teamSize && <p className="text-foreground/80"><span className="font-semibold">Team Size:</span> {formData.teamSize} engineers</p>}
+            <h4 className="font-bold text-foreground font-poppins mb-3">
+              📋 Snapshot
+            </h4>
+            <p className="text-foreground/80">
+              <span className="font-semibold">Email:</span> {formData.email}
+            </p>
+            {formData.companyName && (
+              <p className="text-foreground/80">
+                <span className="font-semibold">Company:</span>{" "}
+                {formData.companyName}
+              </p>
+            )}
+            {formData.role && (
+              <p className="text-foreground/80">
+                <span className="font-semibold">Role:</span> {formData.role}
+              </p>
+            )}
+            {formData.teamSize && (
+              <p className="text-foreground/80">
+                <span className="font-semibold">Team size:</span>{" "}
+                {formData.teamSize} seats
+              </p>
+            )}
+            {formData.primaryUseCase && (
+              <p className="text-foreground/80">
+                <span className="font-semibold">Primary use case:</span>{" "}
+                {formData.primaryUseCase}
+              </p>
+            )}
           </div>
-          
+
           <div className="p-5 rounded-xl border border-accent-secondary/20 bg-accent-secondary/5 backdrop-blur-sm space-y-3">
-            <h4 className="font-bold text-foreground font-poppins mb-3">🔧 Selected Tools ({formData.tools.length})</h4>
+            <h4 className="font-bold text-foreground font-poppins mb-3">
+              🔧 Selected tools ({formData.tools.length})
+            </h4>
             {formData.tools.length === 0 ? (
-              <p className="text-danger font-semibold">⚠️ Please go back and select at least one tool.</p>
+              <p className="text-danger font-semibold">
+                Please add at least one tool on the previous step.
+              </p>
             ) : (
               <ul className="space-y-2">
-                {formData.tools.map((tool, idx) => (
-                  <li key={tool.toolSlug} className="flex items-start gap-2 text-foreground/80 animate-slide-left" style={{animationDelay: `${idx * 0.1}s`}}>
-                    <span className="text-accent-primary font-bold mt-1">•</span>
-                    <span><span className="font-semibold">{tool.toolSlug.replace("api_", "").toUpperCase()}</span> - {tool.planName.replace("_", " ")} {tool.planName !== "api_usage" ? `(${tool.quantity} seats)` : "(Estimated Tokens)"}</span>
-                  </li>
-                ))}
+                {formData.tools.map((tool) => {
+                  const meta = auditToolLookup.get(tool.toolSlug);
+                  return (
+                    <li
+                      key={tool.toolSlug}
+                      className="flex flex-col gap-1 text-foreground/80"
+                    >
+                      <span className="font-semibold">
+                        {meta?.name ?? tool.toolSlug} ·{" "}
+                        {tool.planName.replaceAll("_", " ")}
+                      </span>
+                      <span className="text-xs text-foreground/50">
+                        Seats/licenses: {tool.seatCount ?? tool.quantity}
+                        {tool.reportedMonthlySpendUsd != null && (
+                          <>
+                            {" "}
+                            · Declared spend{" "}
+                            {formatUsd(tool.reportedMonthlySpendUsd)}
+                          </>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
 
           <div className="p-5 rounded-xl border border-success/20 bg-success/5 backdrop-blur-sm">
             <p className="text-foreground/70 font-inter">
-              ✨ Submit your information and we'll generate your personalized AI spend audit report in seconds!
+              Output is screenshot-ready: USD totals, per-tool actions, and
+              explicit honesty when you are already optimal.
             </p>
           </div>
         </div>
       )}
 
-      {/* Navigation Buttons */}
       <div className="mt-10 flex justify-between gap-4">
         <button
-          onClick={() => setStep(Math.max(1, step - 1))}
-          disabled={step === 1 || isSubmitting}
-          className="group flex-1 sm:flex-none rounded-xl border-2 border-border px-8 py-3 text-sm font-bold text-foreground/70 transition-all duration-300 hover:border-accent-primary/50 hover:text-foreground hover:bg-accent-primary/5 hover:shadow-md disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-border disabled:hover:text-foreground/70 disabled:hover:bg-transparent font-poppins"
+          type="button"
+          onClick={() => goStep(Math.max(1, normalizedStep - 1))}
+          disabled={normalizedStep === 1 || isSubmitting}
+          className="group flex-1 sm:flex-none rounded-xl border-2 border-border px-8 py-3 text-sm font-bold text-foreground/70 transition-all duration-300 hover:border-accent-primary/50 hover:text-foreground hover:bg-accent-primary/5 hover:shadow-md disabled:opacity-30 disabled:cursor-not-allowed font-poppins"
         >
           ← Back
         </button>
         <button
+          type="button"
           onClick={() => {
-            if (step === totalSteps) {
+            if (normalizedStep === totalSteps) {
               if (formData.tools.length > 0 && formData.email) {
                 handleSubmit();
               } else {
-                setError("Please ensure you have entered an email and selected at least one tool.");
+                setError(
+                  "Add at least one tool and a work email before generating the audit."
+                );
               }
             } else {
-              setStep(Math.min(totalSteps, step + 1));
+              goStep(Math.min(totalSteps, normalizedStep + 1));
             }
           }}
           disabled={isSubmitting}
           className="group relative flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-accent-primary to-accent-secondary px-8 py-3 text-sm font-bold text-white transition-all duration-300 hover:shadow-[0_10px_30px_rgba(99,102,241,0.3)] hover:-translate-y-1 disabled:opacity-50 disabled:hover:shadow-none disabled:hover:-translate-y-0 overflow-hidden font-poppins"
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-accent-secondary to-accent-tertiary opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           <span className="relative flex items-center justify-center gap-2">
             {isSubmitting ? (
+              <>Generating…</>
+            ) : normalizedStep === totalSteps ? (
               <>
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Generating...
-              </>
-            ) : step === totalSteps ? (
-              <>
-                Get My Audit
-                <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                Generate audit
+                <svg
+                  className="w-4 h-4 group-hover:translate-x-1 transition-transform"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"
+                  />
                 </svg>
               </>
             ) : (
               <>
                 Continue
-                <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                <svg
+                  className="w-4 h-4 group-hover:translate-x-1 transition-transform"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"
+                  />
                 </svg>
               </>
             )}
