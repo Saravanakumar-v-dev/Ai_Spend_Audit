@@ -27,8 +27,6 @@ export const metadata: Metadata = {
     "ChatGPT business pricing",
     "Claude pricing",
     "AI tool comparison",
-    "AI spending tracker",
-    "developer tool audit",
   ],
   authors: [{ name: "Saravanakumar" }],
   creator: "Saravanakumar",
@@ -70,31 +68,19 @@ export const metadata: Metadata = {
   },
 };
 
-import { Outfit, Poppins, Space_Grotesk, Inter } from "next/font/google";
-
-const outfit = Outfit({ 
-  subsets: ["latin"],
-  variable: "--font-outfit",
-  display: "swap",
-});
-
-const poppins = Poppins({
-  weight: ["300", "400", "500", "600", "700", "800"],
-  subsets: ["latin"],
-  variable: "--font-poppins",
-  display: "swap",
-});
-
-const spaceGrotesk = Space_Grotesk({
-  weight: ["400", "500", "600", "700"],
-  subsets: ["latin"],
-  variable: "--font-space-grotesk",
-  display: "swap",
-});
+import { Inter, Poppins } from "next/font/google";
 
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
+});
+
+const poppins = Poppins({
+  weight: ["600", "700"],
+  subsets: ["latin"],
+  variable: "--font-poppins",
   display: "swap",
 });
 
@@ -104,26 +90,47 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${outfit.variable} ${poppins.variable} ${spaceGrotesk.variable} ${inter.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${poppins.variable}`} suppressHydrationWarning>
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#0a0e1a" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="dns-prefetch" href="https://waljptefuiautfuhehyf.supabase.co" />
         <link rel="dns-prefetch" href="https://api.resend.com" />
-        <meta name="format-detection" content="telephone=no" />
+        <link rel="dns-prefetch" href="https://waljptefuiautfuhehyf.supabase.co" />
+        
+        {/* Structured Data — JSON-LD for SEO */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebApplication",
+              "name": "Saravanakumar AI Spend Audit",
+              "applicationCategory": "BusinessApplication",
+              "operatingSystem": "Web",
+              "offers": {
+                "@type": "Offer",
+                "price": "0",
+                "priceCurrency": "USD"
+              },
+              "description": "Free AI spend audit tool that benchmarks Cursor, Copilot, Claude, ChatGPT, Gemini & API costs in USD with personalized savings recommendations.",
+              "url": process.env.NEXT_PUBLIC_BASE_URL || "https://ai-spend-audit.vercel.app",
+              "creator": {
+                "@type": "Person",
+                "name": "Saravanakumar"
+              }
+            })
+          }}
+        />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans antialiased">
-        {/* Skip to main content link for accessibility */}
+        {/* Skip to main content link */}
         <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:bg-accent-primary focus:text-white focus:px-3 focus:py-2 focus:rounded-md focus:text-sm focus:font-semibold">
           Skip to main content
         </a>
         
-        {/* Dynamic background effect */}
-        <div className="fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-accent-primary/20 via-background to-background pointer-events-none" aria-hidden="true"></div>
-        
         {children}
+        
+
       </body>
     </html>
   );

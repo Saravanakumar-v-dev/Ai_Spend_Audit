@@ -64,6 +64,8 @@ export default function OptimizationNotifySignup({
           <input
             type="email"
             required
+            id="notify-email"
+            aria-label="Email address for notifications"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@company.com"

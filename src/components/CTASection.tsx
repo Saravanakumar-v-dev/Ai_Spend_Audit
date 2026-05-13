@@ -19,8 +19,8 @@ export default function CTASection() {
       />
 
       {/* Floating accent orbs */}
-      <div className="absolute top-10 right-10 w-40 h-40 bg-accent-primary/10 rounded-full blur-3xl opacity-40 animate-float pointer-events-none" aria-hidden="true" />
-      <div className="absolute bottom-10 left-10 w-40 h-40 bg-accent-tertiary/10 rounded-full blur-3xl opacity-30 animate-float-slow pointer-events-none" aria-hidden="true" />
+      <div className="absolute top-10 right-10 w-40 h-40 bg-accent-primary/10 rounded-full blur-2xl opacity-40 animate-float pointer-events-none" aria-hidden="true" />
+      <div className="absolute bottom-10 left-10 w-40 h-40 bg-accent-tertiary/10 rounded-full blur-2xl opacity-30 animate-float-slow pointer-events-none" aria-hidden="true" />
 
       <div className="text-center max-w-lg mx-auto relative z-10">
         <div className="inline-flex items-center gap-2 rounded-full bg-accent-glow border border-accent-primary/30 px-4 py-1.5 text-xs font-bold text-accent-primary mb-6 font-poppins">
@@ -79,7 +79,7 @@ export default function CTASection() {
             {["Startups", "Scale-ups", "Enterprises"].map((badge) => (
               <span
                 key={badge}
-                className="text-xs font-semibold text-accent-primary bg-accent-glow px-3 py-1 rounded-full border border-accent-primary/20 font-poppins"
+                className="text-xs font-semibold text-accent-primary-hover bg-accent-glow px-3 py-1 rounded-full border border-accent-primary/20 font-poppins"
                 role="listitem"
               >
                 {badge}

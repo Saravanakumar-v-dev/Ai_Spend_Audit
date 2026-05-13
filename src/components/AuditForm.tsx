@@ -254,7 +254,7 @@ export default function AuditForm() {
               className="block text-sm font-semibold text-foreground/80 mb-2 font-poppins"
             >
               Company{" "}
-              <span className="text-foreground/40 text-xs font-normal">
+              <span className="text-foreground/60 text-xs font-normal">
                 (optional)
               </span>
             </label>
@@ -274,7 +274,7 @@ export default function AuditForm() {
               className="block text-sm font-semibold text-foreground/80 mb-2 font-poppins"
             >
               Role{" "}
-              <span className="text-foreground/40 text-xs font-normal">
+              <span className="text-foreground/60 text-xs font-normal">
                 (optional)
               </span>
             </label>
@@ -294,7 +294,7 @@ export default function AuditForm() {
               className="block text-sm font-semibold text-foreground/80 mb-2 font-poppins"
             >
               Engineering team size{" "}
-              <span className="text-foreground/40 text-xs font-normal">
+              <span className="text-foreground/60 text-xs font-normal">
                 (seats)
               </span>
             </label>
@@ -426,10 +426,11 @@ export default function AuditForm() {
                     {!isApi ? (
                       <div className="grid sm:grid-cols-2 gap-3">
                         <div>
-                          <label className="text-[11px] uppercase tracking-wide text-foreground/40 font-semibold">
+                          <label htmlFor={`seats-${tool.slug}`} className="text-[11px] uppercase tracking-wide text-foreground/40 font-semibold">
                             Billed seats / licenses
                           </label>
                           <input
+                            id={`seats-${tool.slug}`}
                             type="number"
                             min={1}
                             value={active.seatCount ?? active.quantity}
@@ -444,10 +445,11 @@ export default function AuditForm() {
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] uppercase tracking-wide text-foreground/40 font-semibold">
+                          <label htmlFor={`invoice-${tool.slug}`} className="text-[11px] uppercase tracking-wide text-foreground/40 font-semibold">
                             Invoice (USD / mo, optional)
                           </label>
                           <input
+                            id={`invoice-${tool.slug}`}
                             type="number"
                             min={0}
                             step="0.01"
@@ -466,10 +468,11 @@ export default function AuditForm() {
                       </div>
                     ) : (
                       <div>
-                        <label className="text-[11px] uppercase tracking-wide text-foreground/40 font-semibold">
+                        <label htmlFor={`api-invoice-${tool.slug}`} className="text-[11px] uppercase tracking-wide text-foreground/40 font-semibold">
                           Cloud invoice (USD / mo, optional)
                         </label>
                         <input
+                          id={`api-invoice-${tool.slug}`}
                           type="number"
                           min={0}
                           step="0.01"
@@ -519,10 +522,11 @@ export default function AuditForm() {
                     {isApi && (
                       <div className="grid sm:grid-cols-2 gap-3">
                         <div>
-                          <label className="text-[11px] uppercase tracking-wide text-foreground/40 font-semibold">
+                          <label htmlFor={`input-tokens-${tool.slug}`} className="text-[11px] uppercase tracking-wide text-foreground/40 font-semibold">
                             Input tokens / mo (millions)
                           </label>
                           <input
+                            id={`input-tokens-${tool.slug}`}
                             type="number"
                             min={0}
                             step={0.1}
@@ -545,10 +549,11 @@ export default function AuditForm() {
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] uppercase tracking-wide text-foreground/40 font-semibold">
+                          <label htmlFor={`output-tokens-${tool.slug}`} className="text-[11px] uppercase tracking-wide text-foreground/40 font-semibold">
                             Output tokens / mo (millions)
                           </label>
                           <input
+                            id={`output-tokens-${tool.slug}`}
                             type="number"
                             min={0}
                             step={0.1}

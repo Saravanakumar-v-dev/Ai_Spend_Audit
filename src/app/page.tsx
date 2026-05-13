@@ -5,9 +5,17 @@
  * Contains the marketing hero, value propositions, and the audit form.
  */
 
-import AuditForm from "@/components/AuditForm";
+import dynamic from "next/dynamic";
 import CTASection from "@/components/CTASection";
 import { Metadata } from "next";
+
+/* Lazy-load the heavy AuditForm client component (31 KB, 735 LOC)
+   to reduce Total Blocking Time and improve Lighthouse performance. */
+const AuditForm = dynamic(() => import("@/components/AuditForm"), {
+  loading: () => (
+    <div className="glass-elevated rounded-2xl p-8 h-[400px] animate-pulse border border-accent-primary/20" />
+  ),
+});
 
 export const metadata: Metadata = {
   title: "Free AI Spend Audit for Your Team | Saravanakumar",
@@ -20,9 +28,9 @@ export const metadata: Metadata = {
 
 export default function HomePage() {
   return (
-    <main id="main-content" className="min-h-screen bg-background overflow-hidden" role="main">
+    <main id="main-content" className="min-h-screen bg-background overflow-hidden">
       {/* Navigation */}
-      <nav className="border-b border-border/50 px-6 py-4 sticky top-0 z-50 backdrop-blur-md bg-background/80" aria-label="Main navigation" role="navigation">
+      <nav className="border-b border-border/50 px-6 py-4 sticky top-0 z-50 backdrop-blur-sm bg-background/90" aria-label="Main navigation">
         <div className="mx-auto max-w-5xl flex items-center justify-between">
           <a href="https://saravanakumar-v-portfolio.vercel.app/" target="_blank" rel="noopener noreferrer" className="text-xl font-bold gradient-text-fast font-display hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:rounded" aria-label="Saravanakumar Spend Lab - Home">
             Saravanakumar Spend Lab
@@ -30,7 +38,7 @@ export default function HomePage() {
           <a
             href="#audit-form"
             className="group relative rounded-full bg-accent-primary/10 px-5 py-2.5 text-sm font-semibold text-accent-primary transition-all duration-300 hover:bg-accent-primary hover:text-white hover:shadow-[0_0_20px_var(--accent-glow)] hover:-translate-y-0.5 border border-accent-primary/20 hover:border-accent-primary/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-primary"
-            aria-label="Navigate to audit form"
+            aria-label="Start Free Audit"
           >
             <span className="relative z-10 flex items-center gap-2">
               Start Free Audit
@@ -45,10 +53,10 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative px-6 pt-20 pb-16 sm:pt-28 sm:pb-20 overflow-hidden" aria-labelledby="hero-title">
         {/* Animated background gradient orbs */}
-        <div className="absolute -top-20 -right-20 w-96 h-96 bg-gradient-to-br from-accent-primary/20 to-accent-secondary/10 rounded-full blur-3xl opacity-40 animate-float-slow" aria-hidden="true" />
-        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-gradient-to-tr from-accent-tertiary/15 to-accent-quaternary/10 rounded-full blur-3xl opacity-30 animate-float" aria-hidden="true" />
+        <div className="absolute -top-20 -right-20 w-96 h-96 bg-gradient-to-br from-accent-primary/20 to-accent-secondary/10 rounded-full blur-2xl opacity-40 animate-float-slow" aria-hidden="true" />
+        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-gradient-to-tr from-accent-tertiary/15 to-accent-quaternary/10 rounded-full blur-2xl opacity-30 animate-float" aria-hidden="true" />
 
-        <div className="mx-auto max-w-3xl text-center animate-slide-up relative z-10">
+        <div className="mx-auto max-w-3xl text-center relative z-10">
           <div className="inline-flex items-center gap-2 rounded-full bg-accent-glow border border-accent-primary/20 px-4 py-1.5 text-xs font-medium text-accent-primary mb-6 backdrop-blur-sm hover:border-accent-primary/40 transition-all animate-bounce-in">
             <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-primary opacity-75"></span>
@@ -57,20 +65,20 @@ export default function HomePage() {
             <span className="font-poppins">✨ Free for startups — no credit card required</span>
           </div>
 
-          <h1 id="hero-title" className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-foreground leading-[1.05] font-display mb-6 animate-slide-up" style={{animationDelay: "0.1s"}}>
+          <h1 id="hero-title" className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-foreground leading-[1.05] font-display mb-6">
             Your team is{" "}
             <span className="gradient-text animate-gradient-shift">overspending</span>
             <br />
             on AI tools.
           </h1>
 
-          <p className="mt-6 text-lg sm:text-xl text-foreground/70 max-w-xl mx-auto leading-relaxed font-inter animate-slide-up" style={{animationDelay: "0.2s"}}>
+          <p className="mt-6 text-lg sm:text-xl text-foreground/70 max-w-xl mx-auto leading-relaxed font-inter animate-fade-in" style={{animationDelay: "0.15s"}}>
             Cursor, Copilot, ChatGPT, Claude, Gemini — the typical dev shop now layers{" "}
             <span className="text-warning font-bold bg-warning/10 px-2 py-1 rounded-lg">$600–1,500 / seat / year</span>{" "}
             in AI subscriptions. <span className="text-danger">Most can be right-sized.</span>
           </p>
 
-          <p className="mt-4 text-sm text-foreground/50 font-inter animate-slide-up" style={{animationDelay: "0.3s"}}>
+          <p className="mt-4 text-sm text-foreground/50 font-inter animate-fade-in" style={{animationDelay: "0.25s"}}>
             Get a free, personalized audit in 2 minutes. Shareable report with your team.
           </p>
 
@@ -187,14 +195,14 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border/50 px-6 py-10 bg-surface/20 backdrop-blur-sm mt-16" role="contentinfo" aria-label="Site footer">
+      <footer className="border-t border-border/50 px-6 py-10 bg-surface/20 backdrop-blur-sm mt-16" aria-label="Site footer">
         <div className="mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-foreground/50 font-inter">
           <p>© 2026 Saravanakumar Spend Lab. All rights reserved.</p>
           <nav className="flex gap-8" aria-label="Footer navigation">
-            <span className="text-foreground/30 cursor-default" title="Privacy policy coming soon">
+            <span className="text-foreground/50 cursor-default" title="Privacy policy coming soon">
               Privacy
             </span>
-            <span className="text-foreground/30 cursor-default" title="Terms of service coming soon">
+            <span className="text-foreground/50 cursor-default" title="Terms of service coming soon">
               Terms
             </span>
             <a

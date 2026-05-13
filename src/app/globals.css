@@ -102,6 +102,8 @@ body::before {
     radial-gradient(circle at 80% 80%, rgba(236, 72, 153, 0.06) 0%, transparent 50%);
   pointer-events: none;
   z-index: -2;
+  contain: strict;
+  will-change: auto;
 }
 
 /* Smooth scrolling */
@@ -141,6 +143,8 @@ html {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
+  contain: layout style;
+  transform: translateZ(0);
 }
 
 .glass::before {
@@ -166,6 +170,12 @@ html {
   left: 100%;
 }
 
+/* GPU-accelerated glass shimmer */
+.glass::before {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
 .glass-elevated {
   background: rgba(26, 34, 53, 0.8);
   backdrop-filter: blur(24px);
@@ -173,6 +183,8 @@ html {
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
   transition: all 0.3s ease;
+  contain: layout style;
+  transform: translateZ(0);
 }
 
 .glass-elevated:hover {
@@ -197,7 +209,6 @@ html {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  animation: gradient-shift 6s ease infinite;
   background-size: 200% 200%;
 }
 
@@ -235,7 +246,6 @@ html {
     rgba(99, 102, 241, 0.1) 0%, 
     rgba(167, 139, 250, 0.05) 50%, 
     rgba(236, 72, 153, 0.1) 100%);
-  animation: gradient-shift 8s ease infinite;
   background-size: 200% 200%;
 }
 
@@ -540,10 +550,14 @@ html {
 
 .animate-float {
   animation: float 6s ease-in-out infinite;
+  will-change: transform;
+  contain: layout;
 }
 
 .animate-float-slow {
   animation: float-slow 8s ease-in-out infinite;
+  will-change: transform;
+  contain: layout;
 }
 
 .animate-glow-text {
