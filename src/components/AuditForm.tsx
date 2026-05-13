@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { AuditFormData, ToolSelection } from "@/lib/validators";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -51,31 +51,34 @@ export default function AuditForm() {
     return map;
   }, []);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { id, value, type } = e.target;
-    let key = id;
-    if (id === "company-name") key = "companyName";
-    if (id === "team-size") key = "teamSize";
-    if (id === "primary-use-case") key = "primaryUseCase";
+  const handleChange = useCallback(
+    (
+      e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    ) => {
+      const { id, value, type } = e.target;
+      let key = id;
+      if (id === "company-name") key = "companyName";
+      if (id === "team-size") key = "teamSize";
+      if (id === "primary-use-case") key = "primaryUseCase";
 
-    setFormData((prev) => ({
-      ...prev,
-      [key]:
-        type === "number"
-          ? value === ""
-            ? undefined
-            : Number(value)
-          : value,
-    }));
-  };
+      setFormData((prev) => ({
+        ...prev,
+        [key]:
+          type === "number"
+            ? value === ""
+              ? undefined
+              : Number(value)
+            : value,
+      }));
+    },
+    [setFormData]
+  );
 
-  const handleHoneypotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleHoneypotChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setHoneypot(e.target.value);
-  };
+  }, []);
 
-  const addTool = (choice: AuditToolChoice, planName: string) => {
+  const addTool = useCallback((choice: AuditToolChoice, planName: string) => {
     const option = choice.options.find((o) => o.planName === planName);
     if (!option) return;
     const team = formData.teamSize || 1;
@@ -95,33 +98,36 @@ export default function AuditForm() {
       if (prev.tools.find((t) => t.toolSlug === choice.slug)) return prev;
       return { ...prev, tools: [...prev.tools, newTool] };
     });
-  };
+  }, [formData.teamSize, setFormData]);
 
-  const removeTool = (toolSlug: string) => {
+  const removeTool = useCallback((toolSlug: string) => {
     setFormData((prev) => ({
       ...prev,
       tools: prev.tools.filter((t) => t.toolSlug !== toolSlug),
     }));
-  };
+  }, [setFormData]);
 
-  const updateTool = (
-    slug: string,
-    patch: Partial<ToolSelection>
-  ) => {
-    setFormData((prev) => ({
-      ...prev,
-      tools: prev.tools.map((t) =>
-        t.toolSlug === slug ? { ...t, ...patch } : t
-      ),
-    }));
-  };
+  const updateTool = useCallback(
+    (
+      slug: string,
+      patch: Partial<ToolSelection>
+    ) => {
+      setFormData((prev) => ({
+        ...prev,
+        tools: prev.tools.map((t) =>
+          t.toolSlug === slug ? { ...t, ...patch } : t
+        ),
+      }));
+    },
+    [setFormData]
+  );
 
-  const goStep = (next: number) => {
+  const goStep = useCallback((next: number) => {
     const clamped = Math.min(Math.max(next, 1), totalSteps);
     setStep(clamped);
-  };
+  }, [setStep, totalSteps]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     setIsSubmitting(true);
     setError(null);
     try {
@@ -149,7 +155,7 @@ export default function AuditForm() {
       setError(err instanceof Error ? err.message : "Failed to generate audit");
       setIsSubmitting(false);
     }
-  };
+  }, [formData, honeypot, router, setFormData, setStep]);
 
   if (!hydrated) {
     return <div className="glass rounded-2xl p-8 h-[400px] animate-pulse" />;
